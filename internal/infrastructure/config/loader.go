@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -24,7 +25,8 @@ func Load(configPath string) (*Config, error) {
 
 	// Read config file
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFoundError) {
 			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
 		// Config file not found, will use env vars and defaults
@@ -51,35 +53,35 @@ func Load(configPath string) (*Config, error) {
 
 func bindEnvVars(v *viper.Viper) {
 	// App
-	v.BindEnv("app.name", "APP_NAME")
-	v.BindEnv("app.env", "APP_ENV")
-	v.BindEnv("app.version", "APP_VERSION")
+	_ = v.BindEnv("app.name", "APP_NAME")
+	_ = v.BindEnv("app.env", "APP_ENV")
+	_ = v.BindEnv("app.version", "APP_VERSION")
 
 	// Server
-	v.BindEnv("server.host", "SERVER_HOST")
-	v.BindEnv("server.port", "SERVER_PORT")
+	_ = v.BindEnv("server.host", "SERVER_HOST")
+	_ = v.BindEnv("server.port", "SERVER_PORT")
 
 	// Database
-	v.BindEnv("database.host", "DATABASE_HOST")
-	v.BindEnv("database.port", "DATABASE_PORT")
-	v.BindEnv("database.user", "DATABASE_USER")
-	v.BindEnv("database.password", "DATABASE_PASSWORD")
-	v.BindEnv("database.name", "DATABASE_NAME")
-	v.BindEnv("database.ssl_mode", "DATABASE_SSL_MODE")
+	_ = v.BindEnv("database.host", "DATABASE_HOST")
+	_ = v.BindEnv("database.port", "DATABASE_PORT")
+	_ = v.BindEnv("database.user", "DATABASE_USER")
+	_ = v.BindEnv("database.password", "DATABASE_PASSWORD")
+	_ = v.BindEnv("database.name", "DATABASE_NAME")
+	_ = v.BindEnv("database.ssl_mode", "DATABASE_SSL_MODE")
 
 	// Redis
-	v.BindEnv("redis.host", "REDIS_HOST")
-	v.BindEnv("redis.port", "REDIS_PORT")
-	v.BindEnv("redis.password", "REDIS_PASSWORD")
-	v.BindEnv("redis.db", "REDIS_DB")
+	_ = v.BindEnv("redis.host", "REDIS_HOST")
+	_ = v.BindEnv("redis.port", "REDIS_PORT")
+	_ = v.BindEnv("redis.password", "REDIS_PASSWORD")
+	_ = v.BindEnv("redis.db", "REDIS_DB")
 
 	// JWT
-	v.BindEnv("jwt.secret", "JWT_SECRET")
-	v.BindEnv("jwt.expiration", "JWT_EXPIRATION")
+	_ = v.BindEnv("jwt.secret", "JWT_SECRET")
+	_ = v.BindEnv("jwt.expiration", "JWT_EXPIRATION")
 
 	// Logging
-	v.BindEnv("logging.level", "LOG_LEVEL")
-	v.BindEnv("logging.format", "LOG_FORMAT")
+	_ = v.BindEnv("logging.level", "LOG_LEVEL")
+	_ = v.BindEnv("logging.format", "LOG_FORMAT")
 }
 
 func setDefaults(v *viper.Viper) {

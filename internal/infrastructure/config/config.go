@@ -1,3 +1,4 @@
+// Package config provides application configuration.
 package config
 
 import (
@@ -16,12 +17,14 @@ type Config struct {
 	WebSocket WebSocketConfig `mapstructure:"websocket"`
 }
 
+// AppConfig manage environment the app
 type AppConfig struct {
 	Name    string `mapstructure:"name"`
 	Env     string `mapstructure:"env"`
 	Version string `mapstructure:"version"`
 }
 
+// ServerConfig manage the timing API rest
 type ServerConfig struct {
 	Host         string        `mapstructure:"host"`
 	Port         int           `mapstructure:"port"`
@@ -30,6 +33,7 @@ type ServerConfig struct {
 	IdleTimeout  time.Duration `mapstructure:"idle_timeout"`
 }
 
+// DatabaseConfig manage the features of database
 type DatabaseConfig struct {
 	Host            string        `mapstructure:"host"`
 	Port            int           `mapstructure:"port"`
@@ -42,6 +46,7 @@ type DatabaseConfig struct {
 	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
 }
 
+// RedisConfig manage the features of cache
 type RedisConfig struct {
 	Host     string `mapstructure:"host"`
 	Port     int    `mapstructure:"port"`
@@ -50,16 +55,19 @@ type RedisConfig struct {
 	PoolSize int    `mapstructure:"pool_size"`
 }
 
+// JWTConfig manage the auth
 type JWTConfig struct {
 	Secret     string        `mapstructure:"secret"`
 	Expiration time.Duration `mapstructure:"expiration"`
 }
 
+// LoggingConfig manage level the logs
 type LoggingConfig struct {
 	Level  string `mapstructure:"level"`
 	Format string `mapstructure:"format"`
 }
 
+// WebSocketConfig manage buffers the app
 type WebSocketConfig struct {
 	ReadBufferSize  int           `mapstructure:"read_buffer_size"`
 	WriteBufferSize int           `mapstructure:"write_buffer_size"`

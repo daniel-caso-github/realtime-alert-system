@@ -1,3 +1,4 @@
+// package main
 package main
 
 import (
@@ -15,6 +16,7 @@ func main() {
 	// Load .env file (optional, for development)
 	if err := godotenv.Load(); err != nil {
 		// .env file not found is okay, we'll use config.yaml or env vars
+		log.Fatal().Err(err).Msg("Error loading .env file")
 	}
 
 	// Load configuration
