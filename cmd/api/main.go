@@ -1,76 +1,113 @@
-// package main
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/config"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/config"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/http/router"
 )
 
 func main() {
-	// Load .env file (optional, for development)
+	// =========================================================================
+	// CONFIGURACIÓN INICIAL
+	// =========================================================================
+
+	// Cargar variables de entorno desde .env (solo en desarrollo)
 	if err := godotenv.Load(); err != nil {
-		// .env file not found is okay, we'll use config.yaml or env vars
-		log.Fatal().Err(err).Msg("Error loading .env file")
+		// No es error si no existe .env, usaremos config.yaml o variables de entorno
 	}
 
-	// Load configuration
+	// Cargar configuración desde archivo y variables de entorno
 	cfg, err := config.Load("")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to load configuration")
 	}
 
-	// Configure logger based on config
+	// Configurar el logger según la configuración
 	setupLogger(cfg)
+
+	// =========================================================================
+	// INICIO DE LA APLICACIÓN
+	// =========================================================================
 
 	log.Info().
 		Str("app", cfg.App.Name).
 		Str("version", cfg.App.Version).
 		Str("env", cfg.App.Env).
-		Msg("Starting Real-Time Alerting System...")
+		Msg("🚀 Starting Real-Time Alerting System...")
 
-	log.Debug().
-		Str("server_address", cfg.Server.Address()).
-		Str("database_host", cfg.Database.Host).
-		Str("redis_host", cfg.Redis.Host).
-		Msg("Configuration loaded")
+	// =========================================================================
+	// CONFIGURAR SERVIDOR HTTP
+	// =========================================================================
 
-	// TODO: Initialize database
-	// TODO: Initialize Redis
-	// TODO: Initialize HTTP server
-	// TODO: Initialize WebSocket
+	// Crear la aplicación Fiber con todas las rutas
+	app := router.Setup(cfg)
 
-	log.Info().
-		Str("address", cfg.Server.Address()).
-		Msg("Server ready")
+	// =========================================================================
+	// INICIAR SERVIDOR EN GOROUTINE
+	// =========================================================================
 
-	// Graceful shutdown
+	// Iniciamos el servidor en una goroutine separada para poder
+	// manejar el graceful shutdown en el hilo principal.
+	go func() {
+		log.Info().
+			Str("address", cfg.Server.Address()).
+			Msg("✅ HTTP server started")
+
+		if err := app.Listen(cfg.Server.Address()); err != nil {
+			log.Fatal().Err(err).Msg("HTTP server failed")
+		}
+	}()
+
+	// =========================================================================
+	// GRACEFUL SHUTDOWN
+	// =========================================================================
+
+	// Esperamos señales de terminación (Ctrl+C o kill)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Info().Msg("Shutting down server...")
+	log.Info().Msg("🛑 Shutting down server...")
+
+	// Crear contexto con timeout para el shutdown
+	_, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Cerrar el servidor Fiber de forma ordenada
+	if err := app.Shutdown(); err != nil {
+		log.Error().Err(err).Msg("Error during server shutdown")
+	}
+
+	// TODO: Cerrar conexiones a base de datos
+	// TODO: Cerrar conexiones a Redis
+
+	log.Info().Msg("👋 Server stopped gracefully")
 }
 
+// setupLogger configura zerolog según la configuración de la aplicación.
 func setupLogger(cfg *config.Config) {
-	// Set log level
+	// Parsear el nivel de log desde la configuración
 	level, err := zerolog.ParseLevel(cfg.Logging.Level)
 	if err != nil {
 		level = zerolog.DebugLevel
 	}
 	zerolog.SetGlobalLevel(level)
 
-	// Set output format
+	// En desarrollo, usar formato legible para humanos
 	if cfg.Logging.Format == "console" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
 
-	// Add caller info in development
+	// En desarrollo, agregar información del caller (archivo:línea)
 	if cfg.App.IsDevelopment() {
 		log.Logger = log.With().Caller().Logger()
 	}
