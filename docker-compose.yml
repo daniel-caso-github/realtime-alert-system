@@ -1,0 +1,144 @@
+services:
+  # ==========================================================================
+  # APPLICATION
+  # ==========================================================================
+  api:
+    build:
+      context: .
+      target: development
+    container_name: alerting-api
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+    environment:
+      - APP_ENV=development
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - DATABASE_NAME=alerting_db
+      - DATABASE_SSL_MODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - JWT_SECRET=dev-secret-change-in-production
+      - LOG_LEVEL=debug
+      - LOG_FORMAT=console
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - alerting-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # DATABASE
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: alerting-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=alerting_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d alerting_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - alerting-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # CACHE & MESSAGE BROKER
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: alerting-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - alerting-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # OBSERVABILITY (Optional - uncomment when needed)
+  # ==========================================================================
+  # prometheus:
+  #   image: prom/prometheus:v2.48.0
+  #   container_name: alerting-prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+  #     - prometheus-data:/prometheus
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--storage.tsdb.path=/prometheus'
+  #     - '--web.enable-lifecycle'
+  #   networks:
+  #     - alerting-network
+  #   restart: unless-stopped
+
+  # grafana:
+  #   image: grafana/grafana:10.2.0
+  #   container_name: alerting-grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_USER=admin
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #     - GF_USERS_ALLOW_SIGN_UP=false
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+  #     - ./deployments/grafana/provisioning:/etc/grafana/provisioning
+  #   depends_on:
+  #     - prometheus
+  #   networks:
+  #     - alerting-network
+  #   restart: unless-stopped
+
+# ==========================================================================
+# NETWORKS
+# ==========================================================================
+networks:
+  alerting-network:
+    driver: bridge
+    name: alerting-network
+
+# ==========================================================================
+# VOLUMES
+# ==========================================================================
+volumes:
+  postgres-data:
+    name: alerting-postgres-data
+  redis-data:
+    name: alerting-redis-data
+  go-modules:
+    name: alerting-go-modules
+  # prometheus-data:
+  #   name: alerting-prometheus-data
+  # grafana-data:
+  #   name: alerting-grafana-data
