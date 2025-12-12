@@ -1,3 +1,4 @@
+// Package main provides the entry point for the Real-Time Alerting System API.
 package main
 
 import (
@@ -16,13 +17,10 @@ import (
 )
 
 func main() {
-	// =========================================================================
-	// CONFIGURACIÓN INICIAL
-	// =========================================================================
 
 	// Cargar variables de entorno desde .env (solo en desarrollo)
 	if err := godotenv.Load(); err != nil {
-		// No es error si no existe .env, usaremos config.yaml o variables de entorno
+		log.Fatal().Err(err).Msg("Failed to load envs")
 	}
 
 	// Cargar configuración desde archivo y variables de entorno
@@ -34,26 +32,14 @@ func main() {
 	// Configurar el logger según la configuración
 	setupLogger(cfg)
 
-	// =========================================================================
-	// INICIO DE LA APLICACIÓN
-	// =========================================================================
-
 	log.Info().
 		Str("app", cfg.App.Name).
 		Str("version", cfg.App.Version).
 		Str("env", cfg.App.Env).
 		Msg("🚀 Starting Real-Time Alerting System...")
 
-	// =========================================================================
-	// CONFIGURAR SERVIDOR HTTP
-	// =========================================================================
-
 	// Crear la aplicación Fiber con todas las rutas
 	app := router.Setup(cfg)
-
-	// =========================================================================
-	// INICIAR SERVIDOR EN GOROUTINE
-	// =========================================================================
 
 	// Iniciamos el servidor en una goroutine separada para poder
 	// manejar el graceful shutdown en el hilo principal.
@@ -66,10 +52,6 @@ func main() {
 			log.Fatal().Err(err).Msg("HTTP server failed")
 		}
 	}()
-
-	// =========================================================================
-	// GRACEFUL SHUTDOWN
-	// =========================================================================
 
 	// Esperamos señales de terminación (Ctrl+C o kill)
 	quit := make(chan os.Signal, 1)
@@ -86,9 +68,6 @@ func main() {
 	if err := app.Shutdown(); err != nil {
 		log.Error().Err(err).Msg("Error during server shutdown")
 	}
-
-	// TODO: Cerrar conexiones a base de datos
-	// TODO: Cerrar conexiones a Redis
 
 	log.Info().Msg("👋 Server stopped gracefully")
 }
