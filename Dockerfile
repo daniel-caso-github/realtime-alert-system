@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 LABEL authors="danielcaso"
 
@@ -26,7 +26,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 # ============================================================================
 # STAGE 2: Development (with hot-reload)
 # ============================================================================
-FROM golang:1.24-alpine AS development
+FROM golang:1.25-alpine AS development
 
 # Install Air for hot-reload
 RUN go install github.com/air-verse/air@latest
