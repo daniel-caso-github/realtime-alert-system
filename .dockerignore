@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build artifacts
+bin/
+tmp/
+dist/
+
+# Dependencies (will be downloaded in container)
+vendor/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Testing
+coverage.out
+coverage.html
+*.test
+
+# Terraform
+terraform/
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Kubernetes (not needed in app image)
+deployments/kubernetes/
+
+# Misc
+LICENSE
+Makefile
+.editorconfig
+.golangci.yml
+.air.toml
+docker-compose*.yml
