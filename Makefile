@@ -192,3 +192,30 @@ swagger: ## Generate Swagger documentation
 # DEFAULT
 # ============================================================================
 .DEFAULT_GOAL := help
+
+
+# ============================================================================
+# DEVELOPMENT HELPERS
+# ============================================================================
+.PHONY: db-connect
+db-connect: ## Connect to PostgreSQL database
+	@./scripts/db-connect.sh
+
+.PHONY: redis-connect
+redis-connect: ## Connect to Redis
+	@./scripts/redis-connect.sh
+
+.PHONY: db-reset
+db-reset: ## Reset database (WARNING: deletes all data)
+	@./scripts/reset-db.sh
+
+.PHONY: health
+health: ## Check health of all services
+	@./scripts/health-check.sh
+
+.PHONY: logs
+logs: ## View logs (usage: make logs or make logs SERVICE=api)
+	@./scripts/logs.sh $(SERVICE)
+
+.PHONY: dev
+dev: docker-up logs ## Start development environment and show logs
