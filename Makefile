@@ -119,22 +119,45 @@ vendor: ## Vendor dependencies
 	$(GO) mod vendor
 
 # ============================================================================
-# DATABASE
+# DATABASE MIGRATIONS
 # ============================================================================
+DATABASE_URL ?= postgres://postgres:postgres@localhost:5432/alerting_db?sslmode=disable
+
 .PHONY: migrate-up
-migrate-up: ## Run database migrations up
+migrate-up: ## Run all pending migrations
 	@echo "$(BLUE)Running migrations up...$(NC)"
 	migrate -path migrations -database "$(DATABASE_URL)" up
+	@echo "$(GREEN)Migrations completed$(NC)"
 
 .PHONY: migrate-down
-migrate-down: ## Run database migrations down
-	@echo "$(YELLOW)Running migrations down...$(NC)"
+migrate-down: ## Rollback the last migration
+	@echo "$(YELLOW)Rolling back last migration...$(NC)"
 	migrate -path migrations -database "$(DATABASE_URL)" down 1
 
+.PHONY: migrate-down-all
+migrate-down-all: ## Rollback all migrations
+	@echo "$(RED)Rolling back ALL migrations...$(NC)"
+	migrate -path migrations -database "$(DATABASE_URL)" down -all
+
+.PHONY: migrate-version
+migrate-version: ## Show current migration version
+	@migrate -path migrations -database "$(DATABASE_URL)" version
+
+.PHONY: migrate-force
+migrate-force: ## Force set migration version (usage: make migrate-force VERSION=1)
+	@echo "$(YELLOW)Forcing migration version to $(VERSION)...$(NC)"
+	migrate -path migrations -database "$(DATABASE_URL)" force $(VERSION)
+
 .PHONY: migrate-create
-migrate-create: ## Create new migration (usage: make migrate-create NAME=migration_name)
+migrate-create: ## Create new migration (usage: make migrate-create NAME=add_users_table)
 	@echo "$(BLUE)Creating migration: $(NAME)...$(NC)"
 	migrate create -ext sql -dir migrations -seq $(NAME)
+	@echo "$(GREEN)Migration files created$(NC)"
+
+.PHONY: migrate-status
+migrate-status: ## Show migration status
+	@echo "$(BLUE)Migration files:$(NC)"
+	@ls -la migrations/*.sql 2>/dev/null || echo "No migrations found"
 
 # ============================================================================
 # DOCKER
