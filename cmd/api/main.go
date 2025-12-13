@@ -17,19 +17,20 @@ import (
 )
 
 func main() {
-
-	// Cargar variables de entorno desde .env (solo en desarrollo)
+	// Load environment variables from .env file (development only).
+	// In production, environment variables should be set by the container orchestrator.
 	if err := godotenv.Load(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to load envs")
 	}
 
-	// Cargar configuración desde archivo y variables de entorno
+	// Load application configuration from config files and environment variables.
+	// The empty string argument uses the default config path.
 	cfg, err := config.Load("")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to load configuration")
 	}
 
-	// Configurar el logger según la configuración
+	// Configure the global zerolog logger based on application settings.
 	setupLogger(cfg)
 
 	log.Info().
@@ -38,11 +39,11 @@ func main() {
 		Str("env", cfg.App.Env).
 		Msg("🚀 Starting Real-Time Alerting System...")
 
-	// Crear la aplicación Fiber con todas las rutas
+	// Create the Fiber application with all routes configured.
 	app := router.Setup(cfg)
 
-	// Iniciamos el servidor en una goroutine separada para poder
-	// manejar el graceful shutdown en el hilo principal.
+	// Start the HTTP server in a separate goroutine to allow
+	// graceful shutdown handling in the main thread.
 	go func() {
 		log.Info().
 			Str("address", cfg.Server.Address()).
@@ -53,18 +54,20 @@ func main() {
 		}
 	}()
 
-	// Esperamos señales de terminación (Ctrl+C o kill)
+	// Wait for termination signals (Ctrl+C or kill command).
+	// This blocks until a signal is received.
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Info().Msg("🛑 Shutting down server...")
 
-	// Crear contexto con timeout para el shutdown
+	// Create a context with timeout for graceful shutdown.
+	// This gives in-flight requests up to 10 seconds to complete.
 	_, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Cerrar el servidor Fiber de forma ordenada
+	// Shutdown the Fiber server gracefully, waiting for active connections to close.
 	if err := app.Shutdown(); err != nil {
 		log.Error().Err(err).Msg("Error during server shutdown")
 	}
@@ -72,7 +75,13 @@ func main() {
 	log.Info().Msg("👋 Server stopped gracefully")
 }
 
-// setupLogger configura zerolog según la configuración de la aplicación.
+// setupLogger configures the global zerolog logger based on application configuration.
+// It sets the log level, output format, and optionally adds caller information.
+//
+// The function supports the following configurations:
+//   - Log level: Parsed from cfg.Logging.Level (defaults to debug if invalid)
+//   - Output format: "console" for human-readable output, JSON otherwise
+//   - Caller info: Enabled in development mode to show file:line in logs
 func setupLogger(cfg *config.Config) {
 	// Parsear el nivel de log desde la configuración
 	level, err := zerolog.ParseLevel(cfg.Logging.Level)
