@@ -117,7 +117,9 @@ func setDefaults(v *viper.Viper) {
 
 	// JWT defaults
 	v.SetDefault("jwt.secret", "change-me-in-production")
-	v.SetDefault("jwt.expiration", "24h")
+	v.SetDefault("jwt.expiration", "15m")
+	v.SetDefault("jwt.refresh_expiration", "168h")
+	v.SetDefault("jwt.issuer", "realtime-alerting-system")
 
 	// Logging defaults
 	v.SetDefault("logging.level", "debug")

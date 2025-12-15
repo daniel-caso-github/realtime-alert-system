@@ -219,9 +219,10 @@ func TestAlert_NeedsImmediateAttention(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			alert, _ := entity.NewAlert("Test", "Message", tc.severity, "source")
 
-			if tc.status == entity.AlertStatusAcknowledged {
+			switch tc.status {
+			case entity.AlertStatusAcknowledged:
 				_ = alert.Acknowledge(entity.NewID())
-			} else if tc.status == entity.AlertStatusResolved {
+			case entity.AlertStatusResolved:
 				_ = alert.Resolve(entity.NewID())
 			}
 

@@ -57,8 +57,10 @@ type RedisConfig struct {
 
 // JWTConfig manage the auth
 type JWTConfig struct {
-	Secret     string        `mapstructure:"secret"`
-	Expiration time.Duration `mapstructure:"expiration"`
+	Secret            string        `mapstructure:"secret"`
+	Expiration        time.Duration `mapstructure:"expiration"`
+	RefreshExpiration time.Duration `mapstructure:"refresh_expiration"`
+	Issuer            string        `mapstructure:"issuer"`
 }
 
 // LoggingConfig manage level the logs

@@ -73,6 +73,24 @@ test-coverage: ## Run tests with coverage
 test-short: ## Run short tests only
 	$(GO) test -v -short ./...
 
+## test-integration: Run integration tests
+test-integration:
+	@echo "$(BLUE)Running integration tests...$(NC)"
+	$(GO) test -v -cover ./test/integration/...
+
+## test-integration-pretty: Run integration tests with pretty output
+test-pretty:
+	@echo "$(BLUE)Running integration tests...$(NC)"
+	gotestsum --format testname ./test/...
+
+## coverage: Generate coverage report
+coverage:
+	@echo "$(BLUE)Generating coverage report...$(NC)"
+	$(GO) test -coverprofile=coverage.out ./...
+	$(GO) tool cover -html=coverage.out -o coverage.html
+	$(GO) tool cover -func=coverage.out
+	@echo "$(GREEN)Coverage report: coverage.html$(NC)"
+
 # ============================================================================
 # CODE QUALITY
 # ============================================================================
@@ -209,7 +227,7 @@ env: ## Create .env file from example
 .PHONY: swagger
 swagger: ## Generate Swagger documentation
 	@echo "$(BLUE)Generating Swagger docs...$(NC)"
-	swag init -g cmd/api/main.go -o docs/swagger
+	swag init -g cmd/api/main.go -o docs
 
 # ============================================================================
 # DEFAULT

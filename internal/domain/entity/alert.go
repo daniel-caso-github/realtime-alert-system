@@ -108,6 +108,11 @@ type Alert struct {
 	ResolvedAt *time.Time `json:"resolved_at,omitempty" db:"resolved_at"`
 	// ExpiresAt is the optional expiration time for the alert.
 	ExpiresAt *time.Time `json:"expires_at,omitempty" db:"expires_at"`
+	// CreatedAt is the timestamp when the alert was resolved.
+	// CreatedAt is the timestamp when the alert was created.
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	// UpdatedAt is the timestamp when the alert was last updated.
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 	// Timestamps embeds creation and update audit fields.
 	Timestamps
 }
@@ -130,14 +135,15 @@ var (
 // Returns an error if validation fails.
 func NewAlert(title, message string, severity AlertSeverity, source string) (*Alert, error) {
 	alert := &Alert{
-		ID:         NewID(),
-		Title:      title,
-		Message:    message,
-		Severity:   severity,
-		Status:     AlertStatusActive,
-		Source:     source,
-		Metadata:   make(map[string]interface{}),
-		Timestamps: NewTimestamps(),
+		ID:        NewID(),
+		Title:     title,
+		Message:   message,
+		Severity:  severity,
+		Status:    AlertStatusActive,
+		Source:    source,
+		Metadata:  make(map[string]interface{}),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	}
 
 	if err := alert.Validate(); err != nil {

@@ -1,4 +1,23 @@
-// Package main provides the entry point for the Real-Time Alerting System API.
+// Package main is the entry point for the alerting system API.
+//
+//	@title						Real-Time Alerting System API
+//	@version					1.0
+//	@description				Enterprise-grade distributed real-time alerting system
+//	@termsOfService				http://swagger.io/terms/
+//
+//	@contact.name				API Support
+//	@contact.email				support@alerting.local
+//
+//	@license.name				MIT
+//	@license.url				https://opensource.org/licenses/MIT
+//
+//	@host						localhost:8080
+//	@BasePath					/api/v1
+//
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Type "Bearer" followed by a space and JWT token.
 package main
 
 import (
@@ -13,90 +32,118 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/config"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/database"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/http/router"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/websocket"
 )
 
 func main() {
-	// Load environment variables from .env file (development only).
-	// In production, environment variables should be set by the container orchestrator.
-	if err := godotenv.Load(); err != nil {
-		log.Fatal().Err(err).Msg("Failed to load envs")
-	}
+	// Load .env file (optional in production)
+	_ = godotenv.Load()
 
-	// Load application configuration from config files and environment variables.
-	// The empty string argument uses the default config path.
+	// Load configuration
 	cfg, err := config.Load("")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to load configuration")
 	}
 
-	// Configure the global zerolog logger based on application settings.
+	// Setup logger
 	setupLogger(cfg)
 
 	log.Info().
 		Str("app", cfg.App.Name).
 		Str("version", cfg.App.Version).
 		Str("env", cfg.App.Env).
-		Msg("🚀 Starting Real-Time Alerting System...")
+		Msg("Starting application...")
 
-	// Create the Fiber application with all routes configured.
-	app := router.Setup(cfg)
+	// Initialize PostgreSQL
+	db, err := database.NewPostgresDB(&cfg.Database)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to connect to PostgreSQL")
+	}
+	log.Info().Msg("Connected to PostgreSQL")
 
-	// Start the HTTP server in a separate goroutine to allow
-	// graceful shutdown handling in the main thread.
+	// Initialize Redis
+	redisClient, err := database.NewRedisClient(&cfg.Redis)
+	if err != nil {
+		closeDB(db)
+		log.Fatal().Err(err).Msg("Failed to connect to Redis")
+	}
+	log.Info().Msg("Connected to Redis")
+
+	// Initialize repositories
+	userRepo := database.NewPostgresUserRepository(db)
+	alertRepo := database.NewPostgresAlertRepository(db)
+	cacheRepo := database.NewRedisCacheRepository(redisClient)
+
+	// Initialize WebSocket hub
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+	log.Info().Msg("WebSocket hub started")
+
+	// Setup router with dependencies
+	app := router.Setup(router.Dependencies{
+		Config:        cfg,
+		UserRepo:      userRepo,
+		AlertRepo:     alertRepo,
+		CacheRepo:     cacheRepo,
+		DBHealthCheck: db,
+		WSHub:         wsHub,
+	})
+
+	// Start server in goroutine
 	go func() {
-		log.Info().
-			Str("address", cfg.Server.Address()).
-			Msg("✅ HTTP server started")
-
+		log.Info().Str("address", cfg.Server.Address()).Msg("HTTP server started")
 		if err := app.Listen(cfg.Server.Address()); err != nil {
-			log.Fatal().Err(err).Msg("HTTP server failed")
+			log.Fatal().Err(err).Msg("Server failed")
 		}
 	}()
 
-	// Wait for termination signals (Ctrl+C or kill command).
-	// This blocks until a signal is received.
+	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Info().Msg("🛑 Shutting down server...")
+	log.Info().Msg("Shutting down...")
 
-	// Create a context with timeout for graceful shutdown.
-	// This gives in-flight requests up to 10 seconds to complete.
-	_, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Shutdown the Fiber server gracefully, waiting for active connections to close.
-	if err := app.Shutdown(); err != nil {
-		log.Error().Err(err).Msg("Error during server shutdown")
+	if err := app.ShutdownWithContext(ctx); err != nil {
+		log.Error().Err(err).Msg("Error during shutdown")
 	}
 
-	log.Info().Msg("👋 Server stopped gracefully")
+	// Close connections
+	closeRedis(redisClient)
+	closeDB(db)
+
+	log.Info().Msg("Server stopped")
 }
 
-// setupLogger configures the global zerolog logger based on application configuration.
-// It sets the log level, output format, and optionally adds caller information.
-//
-// The function supports the following configurations:
-//   - Log level: Parsed from cfg.Logging.Level (defaults to debug if invalid)
-//   - Output format: "console" for human-readable output, JSON otherwise
-//   - Caller info: Enabled in development mode to show file:line in logs
 func setupLogger(cfg *config.Config) {
-	// Parsear el nivel de log desde la configuración
 	level, err := zerolog.ParseLevel(cfg.Logging.Level)
 	if err != nil {
 		level = zerolog.DebugLevel
 	}
 	zerolog.SetGlobalLevel(level)
 
-	// En desarrollo, usar formato legible para humanos
 	if cfg.Logging.Format == "console" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
 
-	// En desarrollo, agregar información del caller (archivo:línea)
 	if cfg.App.IsDevelopment() {
 		log.Logger = log.With().Caller().Logger()
+	}
+}
+
+func closeDB(db *database.PostgresDB) {
+	if err := db.Close(); err != nil {
+		log.Error().Err(err).Msg("Error closing database connection")
+	}
+}
+
+func closeRedis(client *database.RedisClient) {
+	if err := client.Close(); err != nil {
+		log.Error().Err(err).Msg("Error closing Redis connection")
 	}
 }

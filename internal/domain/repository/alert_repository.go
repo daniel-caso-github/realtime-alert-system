@@ -55,10 +55,10 @@ type AlertRepository interface {
 
 // AlertStatistics contains aggregated alert statistics.
 type AlertStatistics struct {
-	TotalAlerts        int64            `json:"total_alerts"`
-	ActiveAlerts       int64            `json:"active_alerts"`
-	AcknowledgedAlerts int64            `json:"acknowledged_alerts"`
-	ResolvedAlerts     int64            `json:"resolved_alerts"`
+	TotalAlerts        int64            `json:"total_alerts" db:"total_alerts"`
+	ActiveAlerts       int64            `json:"active_alerts" db:"active_alerts"`
+	AcknowledgedAlerts int64            `json:"acknowledged_alerts" db:"acknowledged_alerts"`
+	ResolvedAlerts     int64            `json:"resolved_alerts" db:"resolved_alerts"`
 	BySeverity         map[string]int64 `json:"by_severity"`
 	BySource           map[string]int64 `json:"by_source"`
 }
