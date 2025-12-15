@@ -35,7 +35,9 @@ redis:
 # JWT Configuration
 jwt:
   secret: "your-super-secret-key-change-in-production"
-  expiration: 24h
+  expiration: 15m
+  refresh_expiration: 168h  # 7 days
+  issuer: "realtime-alerting-system"
 
 # Logging Configuration
 logging:
