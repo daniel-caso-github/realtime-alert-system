@@ -12,6 +12,8 @@ import (
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/entity"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/valueobject"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/http/helper"
+
+	"github.com/rs/zerolog/log"
 )
 
 // AlertHandler handles alert-related HTTP requests.
@@ -126,7 +128,8 @@ func (h *AlertHandler) List(c *fiber.Ctx) error {
 		Pagination: pagination,
 	})
 	if err != nil {
-		return helper.InternalError(c, "Failed to list alerts")
+		log.Error().Err(err).Msg("Failed to create alert")
+		return helper.InternalError(c, "Failed to create alert")
 	}
 
 	// Build response
@@ -221,6 +224,7 @@ func (h *AlertHandler) Delete(c *fiber.Ctx) error {
 func (h *AlertHandler) GetStatistics(c *fiber.Ctx) error {
 	stats, err := h.alertService.GetStatistics(c.Context())
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get statistics")
 		return helper.InternalError(c, "Failed to get statistics")
 	}
 

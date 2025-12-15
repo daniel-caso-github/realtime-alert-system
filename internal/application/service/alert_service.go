@@ -1,5 +1,4 @@
-// Package service implements the application layer services following hexagonal architecture.
-// Services orchestrate domain logic and coordinate between repositories and other infrastructure.
+// Package service provides application business logic and use cases.
 package service
 
 import (
@@ -12,74 +11,76 @@ import (
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/valueobject"
 )
 
-// Alert service errors define domain-specific error types for the alert service.
+// Alert service errors.
 var (
-	ErrAlertNotFound = errors.New("alert not found") // Returned when an alert cannot be found by ID
+	ErrAlertNotFound = errors.New("alert not found")
 )
 
-// AlertService handles alert business logic and orchestrates operations between
-// the alert repository and cache. It implements the application use cases for
-// alert management including creation, retrieval, acknowledgment, and resolution.
-type AlertService struct {
-	alertRepo repository.AlertRepository // Primary storage for alerts
-	cacheRepo repository.CacheRepository // Cache for statistics and frequently accessed data
+// AlertEventPublisher defines the interface for publishing alert events.
+type AlertEventPublisher interface {
+	PublishAlertCreated(alert *entity.Alert)
+	PublishAlertAcknowledged(alert *entity.Alert)
+	PublishAlertResolved(alert *entity.Alert)
+	PublishAlertDeleted(alertID string)
 }
 
-// NewAlertService creates a new AlertService with the required dependencies.
-// Both repositories are required for proper operation.
+// AlertService handles alert business logic.
+type AlertService struct {
+	alertRepo repository.AlertRepository
+	cacheRepo repository.CacheRepository
+	publisher AlertEventPublisher
+}
+
+// NewAlertService creates a new alert service.
 func NewAlertService(
-	alertRepo repository.AlertRepository, // Repository for alert persistence
-	cacheRepo repository.CacheRepository, // Repository for caching operations
+	alertRepo repository.AlertRepository,
+	cacheRepo repository.CacheRepository,
+	publisher AlertEventPublisher,
 ) *AlertService {
 	return &AlertService{
 		alertRepo: alertRepo,
 		cacheRepo: cacheRepo,
+		publisher: publisher,
 	}
 }
 
-// CreateAlertInput represents the input parameters for creating a new alert.
-// This struct is used to pass validated data from the handler layer to the service.
+// CreateAlertInput represents input for creating an alert.
 type CreateAlertInput struct {
-	Title    string                 // Alert title (required)
-	Message  string                 // Alert message body (required)
-	Severity entity.AlertSeverity   // Severity level (critical, high, medium, low, info)
-	Source   string                 // Source system that generated the alert
-	Metadata map[string]interface{} // Additional key-value metadata
+	Title    string
+	Message  string
+	Severity entity.AlertSeverity
+	Source   string
+	Metadata map[string]interface{}
 }
 
-// Create creates a new alert and persists it to the database.
-// It creates a domain entity, attaches any metadata, saves to the repository,
-// and invalidates the statistics cache to ensure consistency.
-// Returns the created alert entity or an error if validation or persistence fails.
+// Create creates a new alert.
 func (s *AlertService) Create(ctx context.Context, input CreateAlertInput) (*entity.Alert, error) {
-	// Create the domain entity with validation
 	alert, err := entity.NewAlert(input.Title, input.Message, input.Severity, input.Source)
 	if err != nil {
 		return nil, err
 	}
 
-	// Attach optional metadata to the alert
 	for key, value := range input.Metadata {
 		alert.AddMetadata(key, value)
 	}
 
-	// Persist to the database
 	if err := s.alertRepo.Create(ctx, alert); err != nil {
 		return nil, err
 	}
 
-	// Invalidate statistics cache to reflect the new alert
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
+
+	if s.publisher != nil {
+		s.publisher.PublishAlertCreated(alert)
+	}
 
 	return alert, nil
 }
 
-// GetByID retrieves a single alert by its unique identifier.
-// Returns ErrAlertNotFound if no alert exists with the given ID.
+// GetByID retrieves an alert by ID.
 func (s *AlertService) GetByID(ctx context.Context, id entity.ID) (*entity.Alert, error) {
 	alert, err := s.alertRepo.GetByID(ctx, id)
 	if err != nil {
-		// Convert repository-level not found error to service-level error
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, ErrAlertNotFound
 		}
@@ -88,26 +89,19 @@ func (s *AlertService) GetByID(ctx context.Context, id entity.ID) (*entity.Alert
 	return alert, nil
 }
 
-// ListInput represents the input parameters for listing alerts with filters.
-// It combines filtering criteria with pagination settings.
+// ListInput represents input for listing alerts.
 type ListInput struct {
-	Filter     valueobject.AlertFilter // Criteria for filtering alerts (status, severity, date range, etc.)
-	Pagination valueobject.Pagination  // Pagination settings (page, page size)
+	Filter     valueobject.AlertFilter
+	Pagination valueobject.Pagination
 }
 
-// List retrieves alerts matching the specified filters with pagination.
-// Returns a paginated result containing the alerts and pagination metadata.
+// List retrieves alerts with filters and pagination.
 func (s *AlertService) List(ctx context.Context, input ListInput) (*valueobject.PaginatedResult[*entity.Alert], error) {
 	return s.alertRepo.List(ctx, input.Filter, input.Pagination)
 }
 
-// Acknowledge marks an alert as acknowledged by the specified user.
-// This indicates that a user has seen and is aware of the alert.
-// The operation is atomic: it retrieves the alert, updates its status, and persists the change.
-// Returns ErrAlertNotFound if the alert doesn't exist, or a domain error if
-// the alert cannot be acknowledged (e.g., already resolved).
+// Acknowledge marks an alert as acknowledged.
 func (s *AlertService) Acknowledge(ctx context.Context, alertID, userID entity.ID) (*entity.Alert, error) {
-	// Retrieve the alert from storage
 	alert, err := s.alertRepo.GetByID(ctx, alertID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -116,29 +110,25 @@ func (s *AlertService) Acknowledge(ctx context.Context, alertID, userID entity.I
 		return nil, err
 	}
 
-	// Apply the domain operation to mark as acknowledged
 	if err := alert.Acknowledge(userID); err != nil {
 		return nil, err
 	}
 
-	// Persist the updated alert
 	if err := s.alertRepo.Update(ctx, alert); err != nil {
 		return nil, err
 	}
 
-	// Invalidate statistics cache to reflect the status change
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
+
+	if s.publisher != nil {
+		s.publisher.PublishAlertAcknowledged(alert)
+	}
 
 	return alert, nil
 }
 
-// Resolve marks an alert as resolved by the specified user.
-// This indicates that the issue that triggered the alert has been addressed.
-// The operation is atomic: it retrieves the alert, updates its status, and persists the change.
-// Returns ErrAlertNotFound if the alert doesn't exist, or a domain error if
-// the alert cannot be resolved (e.g., already resolved).
+// Resolve marks an alert as resolved.
 func (s *AlertService) Resolve(ctx context.Context, alertID, userID entity.ID) (*entity.Alert, error) {
-	// Retrieve the alert from storage
 	alert, err := s.alertRepo.GetByID(ctx, alertID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -147,25 +137,24 @@ func (s *AlertService) Resolve(ctx context.Context, alertID, userID entity.ID) (
 		return nil, err
 	}
 
-	// Apply the domain operation to mark as resolved
 	if err := alert.Resolve(userID); err != nil {
 		return nil, err
 	}
 
-	// Persist the updated alert
 	if err := s.alertRepo.Update(ctx, alert); err != nil {
 		return nil, err
 	}
 
-	// Invalidate statistics cache to reflect the status change
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
+
+	if s.publisher != nil {
+		s.publisher.PublishAlertResolved(alert)
+	}
 
 	return alert, nil
 }
 
-// Delete permanently removes an alert from the system.
-// Returns ErrAlertNotFound if no alert exists with the given ID.
-// Use with caution: this operation cannot be undone.
+// Delete removes an alert.
 func (s *AlertService) Delete(ctx context.Context, id entity.ID) error {
 	if err := s.alertRepo.Delete(ctx, id); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -174,39 +163,34 @@ func (s *AlertService) Delete(ctx context.Context, id entity.ID) error {
 		return err
 	}
 
-	// Invalidate statistics cache to reflect the deletion
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
+
+	if s.publisher != nil {
+		s.publisher.PublishAlertDeleted(id.String())
+	}
 
 	return nil
 }
 
-// GetStatistics retrieves aggregated alert statistics for dashboards.
-// It implements a cache-aside pattern: first checking the cache for recent statistics,
-// and falling back to the database if not cached. Results are cached for 1 minute
-// to balance freshness with database load.
+// GetStatistics retrieves alert statistics.
 func (s *AlertService) GetStatistics(ctx context.Context) (*repository.AlertStatistics, error) {
-	// Try to retrieve from cache first (cache-aside pattern)
 	var stats repository.AlertStatistics
 	err := s.cacheRepo.Get(ctx, "stats:alerts", &stats)
 	if err == nil {
-		return &stats, nil // Cache hit
+		return &stats, nil
 	}
 
-	// Cache miss: fetch from database
 	dbStats, err := s.alertRepo.GetStatistics(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Store in cache with 1 minute TTL for subsequent requests
 	_ = s.cacheRepo.Set(ctx, "stats:alerts", dbStats, time.Minute)
 
 	return dbStats, nil
 }
 
-// GetActiveAlerts retrieves all alerts with status "active".
-// This is useful for real-time dashboards and notification systems
-// that need to display current unresolved alerts.
+// GetActiveAlerts retrieves all active alerts.
 func (s *AlertService) GetActiveAlerts(ctx context.Context) ([]*entity.Alert, error) {
 	return s.alertRepo.ListActive(ctx)
 }
