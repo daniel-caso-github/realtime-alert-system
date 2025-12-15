@@ -1,4 +1,23 @@
 // Package main is the entry point for the alerting system API.
+//
+//	@title						Real-Time Alerting System API
+//	@version					1.0
+//	@description				Enterprise-grade distributed real-time alerting system
+//	@termsOfService				http://swagger.io/terms/
+//
+//	@contact.name				API Support
+//	@contact.email				support@alerting.local
+//
+//	@license.name				MIT
+//	@license.url				https://opensource.org/licenses/MIT
+//
+//	@host						localhost:8080
+//	@BasePath					/api/v1
+//
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Type "Bearer" followed by a space and JWT token.
 package main
 
 import (

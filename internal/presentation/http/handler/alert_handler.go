@@ -29,6 +29,20 @@ func NewAlertHandler(alertService *service.AlertService) *AlertHandler {
 }
 
 // Create handles POST /api/v1/alerts
+//
+//	@Summary		Create alert
+//	@Description	Create a new alert
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.CreateAlertRequest	true	"Alert data"
+//	@Success		201		{object}	dto.AlertResponse
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Failure		403		{object}	dto.ErrorResponse
+//	@Failure		422		{object}	dto.ValidationErrorResponse
+//	@Security		BearerAuth
+//	@Router			/alerts [post]
 func (h *AlertHandler) Create(c *fiber.Ctx) error {
 	var req dto.CreateAlertRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -58,6 +72,18 @@ func (h *AlertHandler) Create(c *fiber.Ctx) error {
 }
 
 // GetByID handles GET /api/v1/alerts/:id
+//
+//	@Summary		Get alert by ID
+//	@Description	Retrieve a specific alert
+//	@Tags			alerts
+//	@Produce		json
+//	@Param			id	path		string	true	"Alert ID"
+//	@Success		200	{object}	dto.AlertResponse
+//	@Failure		400	{object}	dto.ErrorResponse
+//	@Failure		401	{object}	dto.ErrorResponse
+//	@Failure		404	{object}	dto.ErrorResponse
+//	@Security		BearerAuth
+//	@Router			/alerts/{id} [get]
 func (h *AlertHandler) GetByID(c *fiber.Ctx) error {
 	id, err := entity.ParseID(c.Params("id"))
 	if err != nil {
@@ -76,6 +102,21 @@ func (h *AlertHandler) GetByID(c *fiber.Ctx) error {
 }
 
 // List handles GET /api/v1/alerts
+//
+//	@Summary		List alerts
+//	@Description	Retrieve paginated list of alerts with optional filters
+//	@Tags			alerts
+//	@Produce		json
+//	@Param			page		query		int		false	"Page number"		default(1)
+//	@Param			page_size	query		int		false	"Items per page"	default(20)
+//	@Param			status		query		[]string	false	"Filter by status"
+//	@Param			severity	query		[]string	false	"Filter by severity"
+//	@Param			source		query		string	false	"Filter by source"
+//	@Param			search		query		string	false	"Search in title/message"
+//	@Success		200			{object}	dto.PaginatedAlertResponse
+//	@Failure		401			{object}	dto.ErrorResponse
+//	@Security		BearerAuth
+//	@Router			/alerts [get]
 func (h *AlertHandler) List(c *fiber.Ctx) error {
 	var req dto.ListAlertsRequest
 	if err := c.QueryParser(&req); err != nil {
@@ -147,6 +188,20 @@ func (h *AlertHandler) List(c *fiber.Ctx) error {
 }
 
 // Acknowledge handles POST /api/v1/alerts/:id/acknowledge
+//
+//	@Summary		Acknowledge alert
+//	@Description	Mark an alert as acknowledged
+//	@Tags			alerts
+//	@Produce		json
+//	@Param			id	path		string	true	"Alert ID"
+//	@Success		200	{object}	dto.AlertResponse
+//	@Failure		400	{object}	dto.ErrorResponse
+//	@Failure		401	{object}	dto.ErrorResponse
+//	@Failure		403	{object}	dto.ErrorResponse
+//	@Failure		404	{object}	dto.ErrorResponse
+//	@Failure		409	{object}	dto.ErrorResponse
+//	@Security		BearerAuth
+//	@Router			/alerts/{id}/acknowledge [post]
 func (h *AlertHandler) Acknowledge(c *fiber.Ctx) error {
 	alertID, err := entity.ParseID(c.Params("id"))
 	if err != nil {
@@ -177,6 +232,20 @@ func (h *AlertHandler) Acknowledge(c *fiber.Ctx) error {
 }
 
 // Resolve handles POST /api/v1/alerts/:id/resolve
+//
+//	@Summary		Resolve alert
+//	@Description	Mark an alert as resolved
+//	@Tags			alerts
+//	@Produce		json
+//	@Param			id	path		string	true	"Alert ID"
+//	@Success		200	{object}	dto.AlertResponse
+//	@Failure		400	{object}	dto.ErrorResponse
+//	@Failure		401	{object}	dto.ErrorResponse
+//	@Failure		403	{object}	dto.ErrorResponse
+//	@Failure		404	{object}	dto.ErrorResponse
+//	@Failure		409	{object}	dto.ErrorResponse
+//	@Security		BearerAuth
+//	@Router			/alerts/{id}/resolve [post]
 func (h *AlertHandler) Resolve(c *fiber.Ctx) error {
 	alertID, err := entity.ParseID(c.Params("id"))
 	if err != nil {
@@ -204,6 +273,18 @@ func (h *AlertHandler) Resolve(c *fiber.Ctx) error {
 }
 
 // Delete handles DELETE /api/v1/alerts/:id
+//
+//	@Summary		Delete alert
+//	@Description	Remove an alert (admin only)
+//	@Tags			alerts
+//	@Param			id	path	string	true	"Alert ID"
+//	@Success		204
+//	@Failure		400	{object}	dto.ErrorResponse
+//	@Failure		401	{object}	dto.ErrorResponse
+//	@Failure		403	{object}	dto.ErrorResponse
+//	@Failure		404	{object}	dto.ErrorResponse
+//	@Security		BearerAuth
+//	@Router			/alerts/{id} [delete]
 func (h *AlertHandler) Delete(c *fiber.Ctx) error {
 	id, err := entity.ParseID(c.Params("id"))
 	if err != nil {
@@ -221,6 +302,15 @@ func (h *AlertHandler) Delete(c *fiber.Ctx) error {
 }
 
 // GetStatistics handles GET /api/v1/alerts/statistics
+//
+//	@Summary		Get alert statistics
+//	@Description	Retrieve aggregated alert statistics
+//	@Tags			alerts
+//	@Produce		json
+//	@Success		200	{object}	dto.AlertStatisticsResponse
+//	@Failure		401	{object}	dto.ErrorResponse
+//	@Security		BearerAuth
+//	@Router			/alerts/statistics [get]
 func (h *AlertHandler) GetStatistics(c *fiber.Ctx) error {
 	stats, err := h.alertService.GetStatistics(c.Context())
 	if err != nil {

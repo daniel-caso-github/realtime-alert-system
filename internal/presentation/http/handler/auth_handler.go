@@ -23,6 +23,18 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 }
 
 // Login handles POST /api/v1/auth/login
+//
+//	@Summary		User login
+//	@Description	Authenticate user and return JWT tokens
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.LoginRequest	true	"Login credentials"
+//	@Success		200		{object}	dto.LoginResponse
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Failure		422		{object}	dto.ValidationErrorResponse
+//	@Router			/auth/login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req dto.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -57,6 +69,18 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 }
 
 // Register handles POST /api/v1/auth/register
+//
+//	@Summary		Register new user
+//	@Description	Create a new user account
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.RegisterRequest	true	"Registration data"
+//	@Success		201		{object}	dto.LoginResponse
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		409		{object}	dto.ErrorResponse
+//	@Failure		422		{object}	dto.ValidationErrorResponse
+//	@Router			/auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req dto.RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -88,6 +112,16 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 }
 
 // RefreshToken handles POST /api/v1/auth/refresh
+//
+//	@Summary		Refresh tokens
+//	@Description	Get new access token using refresh token
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.RefreshTokenRequest	true	"Refresh token"
+//	@Success		200		{object}	dto.TokenResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Router			/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 	var req dto.RefreshTokenRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -121,6 +155,16 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 }
 
 // Logout handles POST /api/v1/auth/logout
+//
+//	@Summary		Logout user
+//	@Description	Invalidate user tokens
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Success		204
+//	@Failure		500	{object}	dto.ErrorResponse
+//	@Security		BearerAuth
+//	@Router			/auth/logout [post]
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	// Get tokens from request
 	accessToken := c.Get("Authorization")
@@ -140,6 +184,15 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 }
 
 // Me handles GET /api/v1/auth/me
+//
+//	@Summary		Get current user
+//	@Description	Get authenticated user information
+//	@Tags			auth
+//	@Produce		json
+//	@Success		200	{object}	dto.UserResponse
+//	@Failure		401	{object}	dto.ErrorResponse
+//	@Security		BearerAuth
+//	@Router			/auth/me [get]
 func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	// Get user from context (set by auth middleware)
 	user, ok := c.Locals("user").(*dto.UserResponse)

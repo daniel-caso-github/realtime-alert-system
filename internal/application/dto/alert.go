@@ -133,3 +133,14 @@ type AlertStatisticsResponse struct {
 	BySeverity         map[string]int64 `json:"by_severity"`         // Count of alerts grouped by severity level
 	BySource           map[string]int64 `json:"by_source"`           // Count of alerts grouped by source
 }
+
+// PaginatedAlertResponse represents a paginated list of alerts for Swagger.
+type PaginatedAlertResponse struct {
+	Items       []AlertResponse `json:"items"`
+	TotalItems  int64           `json:"total_items"`
+	TotalPages  int             `json:"total_pages"`
+	CurrentPage int             `json:"current_page"`
+	PageSize    int             `json:"page_size"`
+	HasNext     bool            `json:"has_next"`
+	HasPrevious bool            `json:"has_previous"`
+}

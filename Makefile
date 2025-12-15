@@ -209,7 +209,7 @@ env: ## Create .env file from example
 .PHONY: swagger
 swagger: ## Generate Swagger documentation
 	@echo "$(BLUE)Generating Swagger docs...$(NC)"
-	swag init -g cmd/api/main.go -o docs/swagger
+	swag init -g cmd/api/main.go -o docs
 
 # ============================================================================
 # DEFAULT

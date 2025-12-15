@@ -10,6 +10,9 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	fiberws "github.com/gofiber/websocket/v2"
+	swagger "github.com/swaggo/fiber-swagger"
+
+	_ "github.com/daniel-caso-github/realtime-alerting-system/docs" // Swagger docs
 
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/application/service"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/repository"
@@ -91,6 +94,9 @@ func Setup(deps Dependencies) *fiber.App {
 	// WebSocket route
 	app.Use("/ws", wsHandler.Upgrade)
 	app.Get("/ws", authMiddleware.OptionalAuth, fiberws.New(wsHandler.Handle))
+
+	// Swagger documentation
+	app.Get("/swagger/*", swagger.WrapHandler)
 
 	return app
 }
