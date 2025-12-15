@@ -1,4 +1,3 @@
-// Package handler provides HTTP handlers for the application.
 package handler
 
 import (
@@ -6,21 +5,22 @@ import (
 
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/application/dto"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/config"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/http/helper"
 )
 
-// HealthHandler maneja los endpoints relacionados con el estado del servicio.
+// HealthHandler handles health check endpoints.
 type HealthHandler struct {
 	config *config.Config
 }
 
-// NewHealthHandler crea una nueva instancia del handler.
+// NewHealthHandler creates a new health handler.
 func NewHealthHandler(cfg *config.Config) *HealthHandler {
 	return &HealthHandler{
 		config: cfg,
 	}
 }
 
-// Check handles the health check endpoint, returning the overall status of the service.
+// Check handles GET /health
 func (h *HealthHandler) Check(c *fiber.Ctx) error {
 	response := dto.HealthResponse{
 		Status:    "healthy",
@@ -32,19 +32,15 @@ func (h *HealthHandler) Check(c *fiber.Ctx) error {
 		},
 	}
 
-	return c.Status(fiber.StatusOK).JSON(response)
+	return helper.Success(c, response)
 }
 
-// Ready verifica si la aplicación está lista para recibir tráfico.
+// Ready handles GET /ready
 func (h *HealthHandler) Ready(c *fiber.Ctx) error {
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status": "ready",
-	})
+	return helper.Success(c, dto.ReadyResponse{Status: "ready"})
 }
 
-// Live verifica si la aplicación está viva (no está colgada).
+// Live handles GET /live
 func (h *HealthHandler) Live(c *fiber.Ctx) error {
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status": "alive",
-	})
+	return helper.Success(c, dto.LiveResponse{Status: "alive"})
 }
