@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -64,4 +65,9 @@ func (p *PostgresDB) Health(ctx context.Context) error {
 // Close closes the database connection.
 func (p *PostgresDB) Close() error {
 	return p.DB.Close()
+}
+
+// ExecContext executes a query without returning any rows.
+func (p *PostgresDB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	return p.DB.ExecContext(ctx, query, args...)
 }

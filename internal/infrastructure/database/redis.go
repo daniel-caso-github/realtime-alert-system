@@ -53,3 +53,8 @@ func (r *RedisClient) Health(ctx context.Context) error {
 func (r *RedisClient) Close() error {
 	return r.client.Close()
 }
+
+// FlushDB clears all keys in the current database.
+func (r *RedisClient) FlushDB(ctx context.Context) error {
+	return r.client.FlushDB(ctx).Err()
+}
