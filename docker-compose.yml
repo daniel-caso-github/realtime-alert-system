@@ -168,6 +168,21 @@ services:
     networks:
       - alerting-network
 
+  # AlertManager
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: alerting-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./deployments/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - alerting-network
+
 # ==========================================================================
 # NETWORKS
 # ==========================================================================
@@ -190,3 +205,5 @@ volumes:
     name: alerting-prometheus-data
   grafana-data:
     name: alerting-grafana-data
+  alertmanager-data:
+    name: alerting-manager-data

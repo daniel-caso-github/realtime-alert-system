@@ -77,6 +77,7 @@ func Setup(deps Dependencies) *fiber.App {
 	authHandler := handler.NewAuthHandler(authService)
 	alertHandler := handler.NewAlertHandler(alertService)
 	adminHandler := handler.NewAdminHandler(deps.DeadLetterProcessor, deps.EventWorker, cbRegistry)
+	webhookHandler := handler.NewWebhookHandler(alertService)
 
 	// Create middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -130,6 +131,10 @@ func Setup(deps Dependencies) *fiber.App {
 	// WebSocket route
 	app.Use("/ws", wsHandler.Upgrade)
 	app.Get("/ws", authMiddleware.OptionalAuth, fiberws.New(wsHandler.Handle))
+
+	// Webhook routes (no auth - secured by network/secret)
+	webhooks := v1.Group("/webhooks")
+	webhooks.Post("/alertmanager", webhookHandler.AlertManagerWebhookHandler)
 
 	return app
 }
