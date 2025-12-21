@@ -9,6 +9,7 @@ import (
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/entity"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/repository"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/valueobject"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/metrics"
 )
 
 // ErrAlertNotFound Alert service errors.
@@ -85,6 +86,10 @@ func (s *AlertService) Create(ctx context.Context, input CreateAlertInput) (*ent
 
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
 
+	// Record metrics
+	metrics.AlertsCreatedTotal.WithLabelValues(string(input.Severity), input.Source).Inc()
+	metrics.AlertsActiveGauge.Inc()
+
 	// Publish to WebSocket (real-time)
 	if s.wsPublisher != nil {
 		s.wsPublisher.PublishAlertCreated(alert)
@@ -141,6 +146,9 @@ func (s *AlertService) Acknowledge(ctx context.Context, alertID, userID entity.I
 
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
 
+	// Record metrics
+	metrics.AlertsAcknowledgedTotal.Inc()
+
 	// Publish to WebSocket (real-time)
 	if s.wsPublisher != nil {
 		s.wsPublisher.PublishAlertAcknowledged(alert)
@@ -174,6 +182,10 @@ func (s *AlertService) Resolve(ctx context.Context, alertID, userID entity.ID) (
 
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
 
+	// Record metrics
+	metrics.AlertsResolvedTotal.Inc()
+	metrics.AlertsActiveGauge.Dec()
+
 	// Publish to WebSocket (real-time)
 	if s.wsPublisher != nil {
 		s.wsPublisher.PublishAlertResolved(alert)
@@ -197,6 +209,9 @@ func (s *AlertService) Delete(ctx context.Context, id entity.ID, deletedBy entit
 	}
 
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
+
+	// Record metrics
+	metrics.AlertsDeletedTotal.Inc()
 
 	// Publish to WebSocket (real-time)
 	if s.wsPublisher != nil {

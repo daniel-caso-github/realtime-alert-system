@@ -91,6 +91,9 @@ func Setup(deps Dependencies) *fiber.App {
 	app.Get("/ready", healthHandler.Ready)
 	app.Get("/live", healthHandler.Live)
 
+	// Metrics endpoint (no auth required)
+	app.Get("/metrics", handler.MetricsHandler())
+
 	// Swagger documentation
 	app.Get("/swagger/*", swagger.WrapHandler)
 
