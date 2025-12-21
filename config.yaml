@@ -50,3 +50,8 @@ websocket:
   write_buffer_size: 1024
   ping_interval: 30s
   pong_timeout: 60s
+
+event_bus:
+  consumer_id: "api-server-1"
+  max_retries: 3
+  retry_backoff: "1s"

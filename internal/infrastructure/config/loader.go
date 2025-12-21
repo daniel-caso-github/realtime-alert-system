@@ -130,4 +130,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("websocket.write_buffer_size", 1024)
 	v.SetDefault("websocket.ping_interval", "30s")
 	v.SetDefault("websocket.pong_timeout", "60s")
+
+	// Event Bus defaults
+	viper.SetDefault("event_bus.consumer_id", "api-server-1")
+	viper.SetDefault("event_bus.max_retries", 3)
+	viper.SetDefault("event_bus.retry_backoff", "1s")
 }

@@ -15,6 +15,7 @@ type Config struct {
 	JWT       JWTConfig       `mapstructure:"jwt"`
 	Logging   LoggingConfig   `mapstructure:"logging"`
 	WebSocket WebSocketConfig `mapstructure:"websocket"`
+	EventBus  EventBusConfig  `mapstructure:"event_bus"`
 }
 
 // AppConfig manage environment the app
@@ -103,4 +104,11 @@ func (a *AppConfig) IsProduction() bool {
 // IsDevelopment returns true if running in development
 func (a *AppConfig) IsDevelopment() bool {
 	return a.Env == "development"
+}
+
+// EventBusConfig holds event bus configuration.
+type EventBusConfig struct {
+	ConsumerID   string        `mapstructure:"consumer_id"`
+	MaxRetries   int           `mapstructure:"max_retries"`
+	RetryBackoff time.Duration `mapstructure:"retry_backoff"`
 }
