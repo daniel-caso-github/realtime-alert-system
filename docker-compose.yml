@@ -86,21 +86,49 @@ services:
   # ==========================================================================
   # OBSERVABILITY (Optional - uncomment when needed)
   # ==========================================================================
-  # prometheus:
-  #   image: prom/prometheus:v2.48.0
-  #   container_name: alerting-prometheus
-  #   ports:
-  #     - "9090:9090"
-  #   volumes:
-  #     - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-  #     - prometheus-data:/prometheus
-  #   command:
-  #     - '--config.file=/etc/prometheus/prometheus.yml'
-  #     - '--storage.tsdb.path=/prometheus'
-  #     - '--web.enable-lifecycle'
-  #   networks:
-  #     - alerting-network
-  #   restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: alerting-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deployments/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - alerting-network
+    depends_on:
+      - api
+
+  # Redis Exporter
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    container_name: alerting-redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis:6379
+    networks:
+      - alerting-network
+    depends_on:
+      - redis
+
+  # PostgreSQL Exporter
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: alerting-postgres-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      - DATA_SOURCE_NAME=postgresql://postgres:postgres@postgres:5432/alerting_db?sslmode=disable
+    networks:
+      - alerting-network
+    depends_on:
+      - postgres
 
   # grafana:
   #   image: grafana/grafana:10.2.0
@@ -138,6 +166,7 @@ volumes:
     name: alerting-redis-data
   go-modules:
     name: alerting-go-modules
+  prometheus_data:
   # prometheus-data:
   #   name: alerting-prometheus-data
   # grafana-data:
