@@ -141,6 +141,14 @@ func setupMiddleware(app *fiber.App, cfg *config.Config) {
 
 	app.Use(requestid.New())
 
+	// Add tracing middleware
+	if cfg.Tracing.Enabled {
+		app.Use(middleware.TracingMiddleware())
+	}
+
+	// Add metrics middleware
+	app.Use(middleware.PrometheusMiddleware())
+
 	if cfg.App.IsDevelopment() {
 		app.Use(logger.New(logger.Config{
 			Format: "${time} | ${status} | ${latency} | ${method} ${path}\n",

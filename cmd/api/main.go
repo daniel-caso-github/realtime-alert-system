@@ -22,6 +22,7 @@ package main
 
 import (
 	"context"
+
 	"os"
 	"os/signal"
 	"syscall"
@@ -34,6 +35,7 @@ import (
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/config"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/database"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/messaging"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/tracing"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/worker"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/http/router"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/websocket"
@@ -72,6 +74,25 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to connect to Redis")
 	}
 	log.Info().Msg("Connected to Redis")
+
+	// Initialize tracing (after critical connections, so defer works properly)
+	shutdownTracer, err := tracing.InitTracer(tracing.Config{
+		ServiceName:    cfg.App.Name,
+		ServiceVersion: cfg.App.Version,
+		Environment:    cfg.App.Env,
+		JaegerEndpoint: cfg.Tracing.JaegerEndpoint,
+		Enabled:        cfg.Tracing.Enabled,
+	})
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to initialize tracing, continuing without it")
+	} else {
+		log.Info().Msg("Tracing initialized")
+		defer func() {
+			if err := shutdownTracer(context.Background()); err != nil {
+				log.Error().Err(err).Msg("Error shutting down tracer")
+			}
+		}()
+	}
 
 	// Initialize repositories
 	userRepo := database.NewPostgresUserRepository(db)

@@ -17,6 +17,7 @@ type Config struct {
 	WebSocket    WebSocketConfig    `mapstructure:"websocket"`
 	EventBus     EventBusConfig     `mapstructure:"event_bus"`
 	Notification NotificationConfig `mapstructure:"notification"`
+	Tracing      TracingConfig      `mapstructure:"tracing"`
 }
 
 // AppConfig manage environment the app
@@ -130,4 +131,10 @@ type NotificationConfig struct {
 	MinSeverity        string        `mapstructure:"min_severity"`
 	RateLimitPerMinute int           `mapstructure:"rate_limit_per_minute"`
 	Timeout            time.Duration `mapstructure:"timeout"`
+}
+
+// TracingConfig holds tracing configuration.
+type TracingConfig struct {
+	Enabled        bool   `mapstructure:"enabled"`
+	JaegerEndpoint string `mapstructure:"jaeger_endpoint"`
 }
