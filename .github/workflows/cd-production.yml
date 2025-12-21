@@ -1,0 +1,110 @@
+name: CD - Production
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull and retag image
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production
+
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            cd /opt/alerting-system
+            docker compose pull
+            docker compose up -d --no-deps api
+            docker system prune -f
+
+      - name: Health Check
+        run: |
+          sleep 30
+          curl -f ${{ secrets.PRODUCTION_URL }}/health || exit 1
+
+      - name: Run Smoke Tests
+        run: |
+          curl -f ${{ secrets.PRODUCTION_URL }}/ready || exit 1
+
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+          text: "Production deployment of version ${{ steps.version.outputs.version }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        if: always() && secrets.SLACK_WEBHOOK != ''
+
+  rollback:
+    name: Rollback (Manual)
+    runs-on: ubuntu-latest
+    environment: production
+    needs: deploy-production
+    if: failure()
+    steps:
+      - name: Rollback to previous version
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            cd /opt/alerting-system
+            docker compose down
+            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production-previous \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production
+            docker compose up -d
+
+      - name: Notify Rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "⚠️ Production rollback triggered for ${{ github.repository }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        if: secrets.SLACK_WEBHOOK != ''
