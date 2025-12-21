@@ -94,7 +94,7 @@ services:
     volumes:
       - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./deployments/prometheus/rules:/etc/prometheus/rules:ro
-      - prometheus_data:/prometheus
+      - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -130,23 +130,23 @@ services:
     depends_on:
       - postgres
 
-  # grafana:
-  #   image: grafana/grafana:10.2.0
-  #   container_name: alerting-grafana
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - GF_SECURITY_ADMIN_USER=admin
-  #     - GF_SECURITY_ADMIN_PASSWORD=admin
-  #     - GF_USERS_ALLOW_SIGN_UP=false
-  #   volumes:
-  #     - grafana-data:/var/lib/grafana
-  #     - ./deployments/grafana/provisioning:/etc/grafana/provisioning
-  #   depends_on:
-  #     - prometheus
-  #   networks:
-  #     - alerting-network
-  #   restart: unless-stopped
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: alerting-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deployments/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deployments/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - alerting-network
+    depends_on:
+      - prometheus
 
 # ==========================================================================
 # NETWORKS
@@ -166,8 +166,7 @@ volumes:
     name: alerting-redis-data
   go-modules:
     name: alerting-go-modules
-  prometheus_data:
-  # prometheus-data:
-  #   name: alerting-prometheus-data
-  # grafana-data:
-  #   name: alerting-grafana-data
+  prometheus-data:
+    name: alerting-prometheus-data
+  grafana-data:
+    name: alerting-grafana-data
