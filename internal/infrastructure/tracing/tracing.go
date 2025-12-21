@@ -10,8 +10,8 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -28,10 +28,15 @@ type Config struct {
 // Tracer is the global tracer instance.
 var Tracer trace.Tracer
 
+func init() {
+	// Initialize with noop tracer by default to prevent nil panics
+	Tracer = noop.NewTracerProvider().Tracer("noop")
+}
+
 // InitTracer initializes the OpenTelemetry tracer.
 func InitTracer(cfg Config) (func(context.Context) error, error) {
 	if !cfg.Enabled {
-		Tracer = otel.Tracer(cfg.ServiceName)
+		Tracer = noop.NewTracerProvider().Tracer(cfg.ServiceName)
 		return func(context.Context) error { return nil }, nil
 	}
 
@@ -42,27 +47,23 @@ func InitTracer(cfg Config) (func(context.Context) error, error) {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		return nil, err
+		Tracer = noop.NewTracerProvider().Tracer(cfg.ServiceName)
+		return func(context.Context) error { return nil }, err
 	}
 
 	exporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
 	if err != nil {
-		return nil, err
+		Tracer = noop.NewTracerProvider().Tracer(cfg.ServiceName)
+		return func(context.Context) error { return nil }, err
 	}
 
-	// Create resource
-	res, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName(cfg.ServiceName),
-			semconv.ServiceVersion(cfg.ServiceVersion),
-			attribute.String("environment", cfg.Environment),
-		),
+	// Create resource without schema URL to avoid conflicts
+	res := resource.NewWithAttributes(
+		"",
+		attribute.String("service.name", cfg.ServiceName),
+		attribute.String("service.version", cfg.ServiceVersion),
+		attribute.String("deployment.environment", cfg.Environment),
 	)
-	if err != nil {
-		return nil, err
-	}
 
 	// Create trace provider
 	tp := sdktrace.NewTracerProvider(
