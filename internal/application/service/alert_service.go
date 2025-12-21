@@ -11,7 +11,7 @@ import (
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/valueobject"
 )
 
-// Alert service errors.
+// ErrAlertNotFound Alert service errors.
 var (
 	ErrAlertNotFound = errors.New("alert not found")
 )
@@ -24,24 +24,39 @@ type AlertEventPublisher interface {
 	PublishAlertDeleted(alertID string)
 }
 
+// AlertEventProducer defines the interface for publishing alert events to the event bus.
+type AlertEventProducer interface {
+	PublishAlertCreated(ctx context.Context, alert *entity.Alert)
+	PublishAlertAcknowledged(ctx context.Context, alert *entity.Alert)
+	PublishAlertResolved(ctx context.Context, alert *entity.Alert)
+	PublishAlertDeleted(ctx context.Context, alertID string, deletedBy string)
+	PublishAlertExpired(ctx context.Context, alert *entity.Alert)
+}
+
 // AlertService handles alert business logic.
 type AlertService struct {
-	alertRepo repository.AlertRepository
-	cacheRepo repository.CacheRepository
-	publisher AlertEventPublisher
+	alertRepo     repository.AlertRepository
+	cacheRepo     repository.CacheRepository
+	wsPublisher   AlertEventPublisher
+	eventProducer AlertEventProducer
 }
 
 // NewAlertService creates a new alert service.
 func NewAlertService(
 	alertRepo repository.AlertRepository,
 	cacheRepo repository.CacheRepository,
-	publisher AlertEventPublisher,
+	wsPublisher AlertEventPublisher,
 ) *AlertService {
 	return &AlertService{
-		alertRepo: alertRepo,
-		cacheRepo: cacheRepo,
-		publisher: publisher,
+		alertRepo:   alertRepo,
+		cacheRepo:   cacheRepo,
+		wsPublisher: wsPublisher,
 	}
+}
+
+// SetEventProducer sets the event producer for async event publishing.
+func (s *AlertService) SetEventProducer(producer AlertEventProducer) {
+	s.eventProducer = producer
 }
 
 // CreateAlertInput represents input for creating an alert.
@@ -70,8 +85,14 @@ func (s *AlertService) Create(ctx context.Context, input CreateAlertInput) (*ent
 
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
 
-	if s.publisher != nil {
-		s.publisher.PublishAlertCreated(alert)
+	// Publish to WebSocket (real-time)
+	if s.wsPublisher != nil {
+		s.wsPublisher.PublishAlertCreated(alert)
+	}
+
+	// Publish to Event Bus (async processing)
+	if s.eventProducer != nil {
+		s.eventProducer.PublishAlertCreated(ctx, alert)
 	}
 
 	return alert, nil
@@ -120,8 +141,8 @@ func (s *AlertService) Acknowledge(ctx context.Context, alertID, userID entity.I
 
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
 
-	if s.publisher != nil {
-		s.publisher.PublishAlertAcknowledged(alert)
+	if s.wsPublisher != nil {
+		s.wsPublisher.PublishAlertAcknowledged(alert)
 	}
 
 	return alert, nil
@@ -147,15 +168,21 @@ func (s *AlertService) Resolve(ctx context.Context, alertID, userID entity.ID) (
 
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
 
-	if s.publisher != nil {
-		s.publisher.PublishAlertResolved(alert)
+	// Publish to WebSocket (real-time)
+	if s.wsPublisher != nil {
+		s.wsPublisher.PublishAlertResolved(alert)
+	}
+
+	// Publish to Event Bus (async processing)
+	if s.eventProducer != nil {
+		s.eventProducer.PublishAlertResolved(ctx, alert)
 	}
 
 	return alert, nil
 }
 
 // Delete removes an alert.
-func (s *AlertService) Delete(ctx context.Context, id entity.ID) error {
+func (s *AlertService) Delete(ctx context.Context, id entity.ID, deletedBy entity.ID) error {
 	if err := s.alertRepo.Delete(ctx, id); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return ErrAlertNotFound
@@ -165,8 +192,14 @@ func (s *AlertService) Delete(ctx context.Context, id entity.ID) error {
 
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
 
-	if s.publisher != nil {
-		s.publisher.PublishAlertDeleted(id.String())
+	// Publish to WebSocket (real-time)
+	if s.wsPublisher != nil {
+		s.wsPublisher.PublishAlertDeleted(id.String())
+	}
+
+	// Publish to Event Bus (async processing)
+	if s.eventProducer != nil {
+		s.eventProducer.PublishAlertDeleted(ctx, id.String(), deletedBy.String())
 	}
 
 	return nil
