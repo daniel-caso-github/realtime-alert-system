@@ -205,6 +205,58 @@ definitions:
       timestamp:
         type: string
     type: object
+  handler.AlertManagerAlert:
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      endsAt:
+        type: string
+      fingerprint:
+        type: string
+      generatorURL:
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      startsAt:
+        type: string
+      status:
+        type: string
+    type: object
+  handler.AlertManagerWebhook:
+    properties:
+      alerts:
+        items:
+          $ref: '#/definitions/handler.AlertManagerAlert'
+        type: array
+      commonAnnotations:
+        additionalProperties:
+          type: string
+        type: object
+      commonLabels:
+        additionalProperties:
+          type: string
+        type: object
+      externalURL:
+        type: string
+      groupKey:
+        type: string
+      groupLabels:
+        additionalProperties:
+          type: string
+        type: object
+      receiver:
+        type: string
+      status:
+        type: string
+      truncatedAlerts:
+        type: integer
+      version:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -218,6 +270,152 @@ info:
   title: Real-Time Alerting System API
   version: "1.0"
 paths:
+  /admin/circuit-breakers:
+    get:
+      description: Retrieve circuit breaker statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get circuit breaker stats
+      tags:
+      - admin
+  /admin/failed-events:
+    get:
+      description: Retrieve all events in the dead letter queue
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get failed events
+      tags:
+      - admin
+  /admin/failed-events/{id}/ignore:
+    post:
+      description: Mark a failed event as ignored
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Ignore failed event
+      tags:
+      - admin
+  /admin/failed-events/{id}/retry:
+    post:
+      description: Retry a failed event from the dead letter queue
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Retry failed event
+      tags:
+      - admin
+  /admin/metrics/events:
+    get:
+      description: Retrieve event processing metrics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get event metrics
+      tags:
+      - admin
   /alerts:
     get:
       description: Retrieve paginated list of alerts with optional filters
@@ -607,6 +805,30 @@ paths:
       summary: Register new user
       tags:
       - auth
+  /webhooks/alertmanager:
+    post:
+      consumes:
+      - application/json
+      description: Receives alerts from Prometheus AlertManager
+      parameters:
+      - description: AlertManager webhook payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AlertManagerWebhook'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Receive AlertManager webhook
+      tags:
+      - webhooks
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

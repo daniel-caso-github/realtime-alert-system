@@ -51,7 +51,7 @@ func (h *AdminHandler) GetCircuitBreakerStats(c *fiber.Ctx) error {
 //	@Description	Retrieve all events in the dead letter queue
 //	@Tags			admin
 //	@Produce		json
-//	@Success		200	{array}		worker.FailedEvent
+//	@Success		200	{array}		map[string]interface{}
 //	@Failure		401	{object}	dto.ErrorResponse
 //	@Failure		403	{object}	dto.ErrorResponse
 //	@Failure		500	{object}	dto.ErrorResponse
