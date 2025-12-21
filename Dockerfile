@@ -13,6 +13,9 @@ ARG BUILD_TIME=unknown
 # Install build dependencies
 RUN apk add --no-cache gcc musl-dev
 
+# Install swag for generating Swagger docs
+RUN go install github.com/swaggo/swag/cmd/swag@latest
+
 # Set working directory
 WORKDIR /app
 
@@ -24,6 +27,9 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+
+# Generate Swagger documentation
+RUN swag init -g cmd/api/main.go -o docs
 
 # Build the application with version info
 RUN CGO_ENABLED=0 GOOS=linux go build \

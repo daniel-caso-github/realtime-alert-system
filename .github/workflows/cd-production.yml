@@ -75,7 +75,7 @@ jobs:
           text: "Production deployment of version ${{ steps.version.outputs.version }}"
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
-        if: always()
+        if: always() && secrets.SLACK_WEBHOOK != ''
 
   rollback:
     name: Rollback (Manual)
@@ -107,3 +107,4 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        if: secrets.SLACK_WEBHOOK != ''
