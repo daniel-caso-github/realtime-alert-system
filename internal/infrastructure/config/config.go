@@ -108,7 +108,9 @@ func (a *AppConfig) IsDevelopment() bool {
 
 // EventBusConfig holds event bus configuration.
 type EventBusConfig struct {
-	ConsumerID   string        `mapstructure:"consumer_id"`
-	MaxRetries   int           `mapstructure:"max_retries"`
-	RetryBackoff time.Duration `mapstructure:"retry_backoff"`
+	ConsumerID     string        `mapstructure:"consumer_id"`
+	MaxRetries     int           `mapstructure:"max_retries"`
+	InitialBackoff time.Duration `mapstructure:"initial_backoff"`
+	MaxBackoff     time.Duration `mapstructure:"max_backoff"`
+	Multiplier     float64       `mapstructure:"multiplier"`
 }

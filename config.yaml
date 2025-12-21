@@ -54,4 +54,6 @@ websocket:
 event_bus:
   consumer_id: "api-server-1"
   max_retries: 3
-  retry_backoff: "1s"
+  initial_backoff: "100ms"
+  max_backoff: "30s"
+  multiplier: 2.0

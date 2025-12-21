@@ -134,5 +134,7 @@ func setDefaults(v *viper.Viper) {
 	// Event Bus defaults
 	viper.SetDefault("event_bus.consumer_id", "api-server-1")
 	viper.SetDefault("event_bus.max_retries", 3)
-	viper.SetDefault("event_bus.retry_backoff", "1s")
+	viper.SetDefault("event_bus.initial_backoff", "100ms")
+	viper.SetDefault("event_bus.max_backoff", "30s")
+	viper.SetDefault("event_bus.multiplier", 2.0)
 }
