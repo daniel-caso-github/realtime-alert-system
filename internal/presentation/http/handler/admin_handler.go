@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/circuitbreaker"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/worker"
@@ -11,14 +12,37 @@ import (
 type AdminHandler struct {
 	deadLetterProcessor *worker.DeadLetterProcessor
 	eventWorker         *worker.EventWorker
+	cbRegistry          *circuitbreaker.Registry
 }
 
 // NewAdminHandler creates a new admin handler.
-func NewAdminHandler(dlp *worker.DeadLetterProcessor, ew *worker.EventWorker) *AdminHandler {
+func NewAdminHandler(dlp *worker.DeadLetterProcessor, ew *worker.EventWorker, cbRegistry *circuitbreaker.Registry) *AdminHandler {
 	return &AdminHandler{
 		deadLetterProcessor: dlp,
 		eventWorker:         ew,
+		cbRegistry:          cbRegistry,
 	}
+}
+
+// Add this method:
+
+// GetCircuitBreakerStats handles GET /api/v1/admin/circuit-breakers
+//
+//	@Summary		Get circuit breaker stats
+//	@Description	Retrieve circuit breaker statistics
+//	@Tags			admin
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	dto.ErrorResponse
+//	@Failure		403	{object}	dto.ErrorResponse
+//	@Security		BearerAuth
+//	@Router			/admin/circuit-breakers [get]
+func (h *AdminHandler) GetCircuitBreakerStats(c *fiber.Ctx) error {
+	if h.cbRegistry == nil {
+		return helper.Success(c, map[string]interface{}{})
+	}
+
+	return helper.Success(c, h.cbRegistry.Stats())
 }
 
 // GetFailedEvents handles GET /api/v1/admin/failed-events
