@@ -22,6 +22,7 @@ package main
 
 import (
 	"context"
+
 	"os"
 	"os/signal"
 	"syscall"
@@ -34,9 +35,14 @@ import (
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/config"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/database"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/messaging"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/tracing"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/worker"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/http/router"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/websocket"
+
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/application/service"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/circuitbreaker"
+	infranotification "github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/notification"
 )
 
 func main() {
@@ -73,6 +79,25 @@ func main() {
 	}
 	log.Info().Msg("Connected to Redis")
 
+	// Initialize tracing (after critical connections, so defer works properly)
+	shutdownTracer, err := tracing.InitTracer(tracing.Config{
+		ServiceName:    cfg.App.Name,
+		ServiceVersion: cfg.App.Version,
+		Environment:    cfg.App.Env,
+		JaegerEndpoint: cfg.Tracing.JaegerEndpoint,
+		Enabled:        cfg.Tracing.Enabled,
+	})
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to initialize tracing, continuing without it")
+	} else {
+		log.Info().Msg("Tracing initialized")
+		defer func() {
+			if err := shutdownTracer(context.Background()); err != nil {
+				log.Error().Err(err).Msg("Error shutting down tracer")
+			}
+		}()
+	}
+
 	// Initialize repositories
 	userRepo := database.NewPostgresUserRepository(db)
 	alertRepo := database.NewPostgresAlertRepository(db)
@@ -95,8 +120,29 @@ func main() {
 	retryableBus := messaging.NewRetryableBus(eventBus, retryConfig)
 	log.Info().Msg("Event bus initialized")
 
+	// Initialize circuit breaker registry
+	cbRegistry := circuitbreaker.NewRegistry()
+
+	// Initialize notification service
+	var notificationService *service.NotificationService
+	if cfg.Notification.Slack.Enabled {
+		slackNotifier := infranotification.NewSlackNotifier(cfg.Notification.Slack, cfg.Notification.Timeout)
+		slackCB := cbRegistry.GetWithConfig(circuitbreaker.Config{
+			Name:             "slack",
+			MaxFailures:      5,
+			Timeout:          30 * time.Second,
+			HalfOpenRequests: 3,
+		})
+		resilientSlack := infranotification.NewResilientNotifier(slackNotifier, slackCB)
+		notificationService = service.NewNotificationService(cfg.Notification, resilientSlack)
+		log.Info().Msg("Slack notifications enabled")
+	} else {
+		notificationService = service.NewNotificationService(cfg.Notification)
+		log.Info().Msg("Slack notifications disabled")
+	}
+
 	// Initialize Event Worker
-	eventWorker := worker.NewEventWorker(retryableBus)
+	eventWorker := worker.NewEventWorker(retryableBus, notificationService)
 	if err := eventWorker.Start(); err != nil {
 		log.Error().Err(err).Msg("Failed to start event worker")
 	}

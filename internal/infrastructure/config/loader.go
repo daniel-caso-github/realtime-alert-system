@@ -146,4 +146,8 @@ func setDefaults(v *viper.Viper) {
 	viper.SetDefault("notification.min_severity", "high")
 	viper.SetDefault("notification.rate_limit_per_minute", 10)
 	viper.SetDefault("notification.timeout", "10s")
+
+	// Tracing defaults
+	viper.SetDefault("tracing.enabled", true)
+	viper.SetDefault("tracing.jaeger_endpoint", "jaeger:4317")
 }

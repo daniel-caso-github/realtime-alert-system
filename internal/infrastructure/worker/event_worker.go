@@ -8,26 +8,29 @@ import (
 
 	appevent "github.com/daniel-caso-github/realtime-alerting-system/internal/application/event"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/application/event/handlers"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/application/service"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/event"
 )
 
 // EventWorker manages event consumers and handlers.
 type EventWorker struct {
-	bus            event.Bus
-	alertConsumer  *appevent.AlertConsumer
-	metricsHandler *handlers.MetricsHandler
-	ctx            context.Context
-	cancel         context.CancelFunc
+	bus                 event.Bus
+	alertConsumer       *appevent.AlertConsumer
+	metricsHandler      *handlers.MetricsHandler
+	notificationService *service.NotificationService
+	ctx                 context.Context
+	cancel              context.CancelFunc
 }
 
 // NewEventWorker creates a new event worker.
-func NewEventWorker(bus event.Bus) *EventWorker {
+func NewEventWorker(bus event.Bus, notificationService *service.NotificationService) *EventWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &EventWorker{
-		bus:    bus,
-		ctx:    ctx,
-		cancel: cancel,
+		bus:                 bus,
+		notificationService: notificationService,
+		ctx:                 ctx,
+		cancel:              cancel,
 	}
 }
 
@@ -44,6 +47,13 @@ func (w *EventWorker) Start() error {
 
 	w.alertConsumer.RegisterHandler(loggingHandler)
 	w.alertConsumer.RegisterHandler(w.metricsHandler)
+
+	// Add notification handler if service is available
+	if w.notificationService != nil {
+		notificationHandler := handlers.NewNotificationHandler(w.notificationService)
+		w.alertConsumer.RegisterHandler(notificationHandler)
+		log.Info().Msg("Notification handler registered")
+	}
 
 	// Subscribe to streams
 	if err := w.bus.Subscribe(w.ctx, event.StreamAlerts, event.GroupAlertProcessors, w.alertConsumer.Handle); err != nil {

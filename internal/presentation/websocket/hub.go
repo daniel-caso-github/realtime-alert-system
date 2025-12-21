@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/entity"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/metrics"
 )
 
 // Hub maintains the set of active clients and broadcasts messages.
@@ -72,6 +73,10 @@ func (h *Hub) registerClient(client *Client) {
 		h.userClients[*client.userID][client] = true
 	}
 
+	// Update Prometheus metrics
+	metrics.WebSocketConnectionsTotal.Inc()
+	metrics.WebSocketConnectionsActive.Set(float64(len(h.clients)))
+
 	log.Info().
 		Int("total_clients", len(h.clients)).
 		Msg("WebSocket client connected")
@@ -98,6 +103,9 @@ func (h *Hub) unregisterClient(client *Client) {
 		}
 	}
 
+	// Update Prometheus metrics
+	metrics.WebSocketConnectionsActive.Set(float64(len(h.clients)))
+
 	log.Info().
 		Int("total_clients", len(h.clients)).
 		Msg("WebSocket client disconnected")
@@ -111,6 +119,9 @@ func (h *Hub) broadcastMessage(message []byte) {
 	for client := range h.clients {
 		client.Send(message)
 	}
+
+	// Update messages sent metric
+	metrics.WebSocketMessagesSent.Add(float64(len(h.clients)))
 }
 
 // Broadcast sends a message to all connected clients.
@@ -143,6 +154,9 @@ func (h *Hub) BroadcastToUser(userID entity.ID, msg Message) {
 	for client := range clients {
 		client.Send(data)
 	}
+
+	// Update messages sent metric
+	metrics.WebSocketMessagesSent.Add(float64(len(clients)))
 }
 
 // BroadcastToRole sends a message to all users with a specific role.
@@ -156,11 +170,16 @@ func (h *Hub) BroadcastToRole(role string, msg Message) {
 		return
 	}
 
+	count := 0
 	for client := range h.clients {
 		if client.userRole == role {
 			client.Send(data)
+			count++
 		}
 	}
+
+	// Update messages sent metric
+	metrics.WebSocketMessagesSent.Add(float64(count))
 }
 
 // ClientCount returns the number of connected clients.

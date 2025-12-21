@@ -68,3 +68,7 @@ notification:
   min_severity: "high"
   rate_limit_per_minute: 10
   timeout: "10s"
+
+tracing:
+  enabled: true
+  jaeger_endpoint: "jaeger:4317"

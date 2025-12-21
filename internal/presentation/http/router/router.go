@@ -77,6 +77,7 @@ func Setup(deps Dependencies) *fiber.App {
 	authHandler := handler.NewAuthHandler(authService)
 	alertHandler := handler.NewAlertHandler(alertService)
 	adminHandler := handler.NewAdminHandler(deps.DeadLetterProcessor, deps.EventWorker, cbRegistry)
+	webhookHandler := handler.NewWebhookHandler(alertService)
 
 	// Create middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -90,6 +91,9 @@ func Setup(deps Dependencies) *fiber.App {
 	app.Get("/health", healthHandler.Check)
 	app.Get("/ready", healthHandler.Ready)
 	app.Get("/live", healthHandler.Live)
+
+	// Metrics endpoint (no auth required)
+	app.Get("/metrics", handler.MetricsHandler())
 
 	// Swagger documentation
 	app.Get("/swagger/*", swagger.WrapHandler)
@@ -128,6 +132,10 @@ func Setup(deps Dependencies) *fiber.App {
 	app.Use("/ws", wsHandler.Upgrade)
 	app.Get("/ws", authMiddleware.OptionalAuth, fiberws.New(wsHandler.Handle))
 
+	// Webhook routes (no auth - secured by network/secret)
+	webhooks := v1.Group("/webhooks")
+	webhooks.Post("/alertmanager", webhookHandler.AlertManagerWebhookHandler)
+
 	return app
 }
 
@@ -137,6 +145,14 @@ func setupMiddleware(app *fiber.App, cfg *config.Config) {
 	}))
 
 	app.Use(requestid.New())
+
+	// Add tracing middleware
+	if cfg.Tracing.Enabled {
+		app.Use(middleware.TracingMiddleware())
+	}
+
+	// Add metrics middleware
+	app.Use(middleware.PrometheusMiddleware())
 
 	if cfg.App.IsDevelopment() {
 		app.Use(logger.New(logger.Config{

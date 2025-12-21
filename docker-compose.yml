@@ -86,39 +86,102 @@ services:
   # ==========================================================================
   # OBSERVABILITY (Optional - uncomment when needed)
   # ==========================================================================
-  # prometheus:
-  #   image: prom/prometheus:v2.48.0
-  #   container_name: alerting-prometheus
-  #   ports:
-  #     - "9090:9090"
-  #   volumes:
-  #     - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-  #     - prometheus-data:/prometheus
-  #   command:
-  #     - '--config.file=/etc/prometheus/prometheus.yml'
-  #     - '--storage.tsdb.path=/prometheus'
-  #     - '--web.enable-lifecycle'
-  #   networks:
-  #     - alerting-network
-  #   restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: alerting-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deployments/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - alerting-network
+    depends_on:
+      - api
 
-  # grafana:
-  #   image: grafana/grafana:10.2.0
-  #   container_name: alerting-grafana
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - GF_SECURITY_ADMIN_USER=admin
-  #     - GF_SECURITY_ADMIN_PASSWORD=admin
-  #     - GF_USERS_ALLOW_SIGN_UP=false
-  #   volumes:
-  #     - grafana-data:/var/lib/grafana
-  #     - ./deployments/grafana/provisioning:/etc/grafana/provisioning
-  #   depends_on:
-  #     - prometheus
-  #   networks:
-  #     - alerting-network
-  #   restart: unless-stopped
+  # Redis Exporter
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    container_name: alerting-redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis:6379
+    networks:
+      - alerting-network
+    depends_on:
+      - redis
+
+  # PostgreSQL Exporter
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: alerting-postgres-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      - DATA_SOURCE_NAME=postgresql://postgres:postgres@postgres:5432/alerting_db?sslmode=disable
+    networks:
+      - alerting-network
+    depends_on:
+      - postgres
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: alerting-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deployments/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deployments/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - alerting-network
+    depends_on:
+      - prometheus
+
+  # Jaeger (Distributed Tracing)
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: alerting-jaeger
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "14250:14250"
+      - "14268:14268"
+      - "14269:14269"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - alerting-network
+
+  # AlertManager
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: alerting-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./deployments/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - alerting-network
 
 # ==========================================================================
 # NETWORKS
@@ -138,7 +201,9 @@ volumes:
     name: alerting-redis-data
   go-modules:
     name: alerting-go-modules
-  # prometheus-data:
-  #   name: alerting-prometheus-data
-  # grafana-data:
-  #   name: alerting-grafana-data
+  prometheus-data:
+    name: alerting-prometheus-data
+  grafana-data:
+    name: alerting-grafana-data
+  alertmanager-data:
+    name: alerting-manager-data
