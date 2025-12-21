@@ -69,9 +69,10 @@ func (h *headerCarrier) Set(key, value string) {
 }
 
 func (h *headerCarrier) Keys() []string {
-	keys := make([]string, 0)
-	h.c.Request().Header.VisitAll(func(key, _ []byte) {
-		keys = append(keys, string(key))
-	})
+	headers := h.c.GetReqHeaders()
+	keys := make([]string, 0, len(headers))
+	for key := range headers {
+		keys = append(keys, key)
+	}
 	return keys
 }
