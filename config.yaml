@@ -57,3 +57,14 @@ event_bus:
   initial_backoff: "100ms"
   max_backoff: "30s"
   multiplier: 2.0
+
+
+notification:
+  slack:
+    enabled: false
+    webhook_url: ""
+    channel: "#alerts"
+    username: "Alert Bot"
+  min_severity: "high"
+  rate_limit_per_minute: 10
+  timeout: "10s"

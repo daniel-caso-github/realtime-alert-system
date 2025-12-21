@@ -8,14 +8,15 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	App       AppConfig       `mapstructure:"app"`
-	Server    ServerConfig    `mapstructure:"server"`
-	Database  DatabaseConfig  `mapstructure:"database"`
-	Redis     RedisConfig     `mapstructure:"redis"`
-	JWT       JWTConfig       `mapstructure:"jwt"`
-	Logging   LoggingConfig   `mapstructure:"logging"`
-	WebSocket WebSocketConfig `mapstructure:"websocket"`
-	EventBus  EventBusConfig  `mapstructure:"event_bus"`
+	App          AppConfig          `mapstructure:"app"`
+	Server       ServerConfig       `mapstructure:"server"`
+	Database     DatabaseConfig     `mapstructure:"database"`
+	Redis        RedisConfig        `mapstructure:"redis"`
+	JWT          JWTConfig          `mapstructure:"jwt"`
+	Logging      LoggingConfig      `mapstructure:"logging"`
+	WebSocket    WebSocketConfig    `mapstructure:"websocket"`
+	EventBus     EventBusConfig     `mapstructure:"event_bus"`
+	Notification NotificationConfig `mapstructure:"notification"`
 }
 
 // AppConfig manage environment the app
@@ -113,4 +114,20 @@ type EventBusConfig struct {
 	InitialBackoff time.Duration `mapstructure:"initial_backoff"`
 	MaxBackoff     time.Duration `mapstructure:"max_backoff"`
 	Multiplier     float64       `mapstructure:"multiplier"`
+}
+
+// SlackConfig holds Slack notification configuration.
+type SlackConfig struct {
+	WebhookURL string `mapstructure:"webhook_url"`
+	Channel    string `mapstructure:"channel"`
+	Username   string `mapstructure:"username"`
+	Enabled    bool   `mapstructure:"enabled"`
+}
+
+// NotificationConfig holds notification configuration.
+type NotificationConfig struct {
+	Slack              SlackConfig   `mapstructure:"slack"`
+	MinSeverity        string        `mapstructure:"min_severity"`
+	RateLimitPerMinute int           `mapstructure:"rate_limit_per_minute"`
+	Timeout            time.Duration `mapstructure:"timeout"`
 }

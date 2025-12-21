@@ -137,4 +137,13 @@ func setDefaults(v *viper.Viper) {
 	viper.SetDefault("event_bus.initial_backoff", "100ms")
 	viper.SetDefault("event_bus.max_backoff", "30s")
 	viper.SetDefault("event_bus.multiplier", 2.0)
+
+	// Notification defaults
+	viper.SetDefault("notification.slack.enabled", false)
+	viper.SetDefault("notification.slack.webhook_url", "")
+	viper.SetDefault("notification.slack.channel", "#alerts")
+	viper.SetDefault("notification.slack.username", "Alert Bot")
+	viper.SetDefault("notification.min_severity", "high")
+	viper.SetDefault("notification.rate_limit_per_minute", 10)
+	viper.SetDefault("notification.timeout", "10s")
 }
