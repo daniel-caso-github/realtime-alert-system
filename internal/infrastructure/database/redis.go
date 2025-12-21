@@ -58,3 +58,8 @@ func (r *RedisClient) Close() error {
 func (r *RedisClient) FlushDB(ctx context.Context) error {
 	return r.client.FlushDB(ctx).Err()
 }
+
+// GetClient returns the underlying Redis client.
+func (r *RedisClient) GetClient() *redis.Client {
+	return r.client
+}

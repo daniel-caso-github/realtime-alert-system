@@ -12,11 +12,15 @@ import (
 	fiberws "github.com/gofiber/websocket/v2"
 	swagger "github.com/swaggo/fiber-swagger"
 
-	_ "github.com/daniel-caso-github/realtime-alerting-system/docs" // Swagger docs
+	_ "github.com/daniel-caso-github/realtime-alerting-system/docs" // Blank import for Swagger documentation initialization
 
+	appevent "github.com/daniel-caso-github/realtime-alerting-system/internal/application/event"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/application/service"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/event"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/domain/repository"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/circuitbreaker"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/config"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/worker"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/http/handler"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/http/middleware"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/websocket"
@@ -24,12 +28,15 @@ import (
 
 // Dependencies holds all dependencies needed by the router.
 type Dependencies struct {
-	Config        *config.Config
-	UserRepo      repository.UserRepository
-	AlertRepo     repository.AlertRepository
-	CacheRepo     repository.CacheRepository
-	DBHealthCheck handler.HealthChecker
-	WSHub         *websocket.Hub
+	Config              *config.Config
+	UserRepo            repository.UserRepository
+	AlertRepo           repository.AlertRepository
+	CacheRepo           repository.CacheRepository
+	DBHealthCheck       handler.HealthChecker
+	WSHub               *websocket.Hub
+	EventBus            event.Publisher
+	EventWorker         *worker.EventWorker
+	DeadLetterProcessor *worker.DeadLetterProcessor
 }
 
 // Setup configures and returns a Fiber app with all routes.
@@ -44,17 +51,32 @@ func Setup(deps Dependencies) *fiber.App {
 
 	setupMiddleware(app, deps.Config)
 
+	// Create circuit breaker registry
+	cbRegistry := circuitbreaker.NewRegistry()
+
 	// Create publisher for WebSocket events
 	alertPublisher := websocket.NewAlertPublisher(deps.WSHub)
+
+	// Create event producer for async processing
+	var alertProducer *appevent.AlertProducer
+	if deps.EventBus != nil {
+		alertProducer = appevent.NewAlertProducer(deps.EventBus)
+	}
 
 	// Create services
 	authService := service.NewAuthService(deps.UserRepo, deps.CacheRepo, &deps.Config.JWT)
 	alertService := service.NewAlertService(deps.AlertRepo, deps.CacheRepo, alertPublisher)
 
+	// Set event producer if available
+	if alertProducer != nil {
+		alertService.SetEventProducer(alertProducer)
+	}
+
 	// Create handlers
 	healthHandler := handler.NewHealthHandler(deps.Config, deps.DBHealthCheck, deps.CacheRepo, deps.WSHub)
 	authHandler := handler.NewAuthHandler(authService)
 	alertHandler := handler.NewAlertHandler(alertService)
+	adminHandler := handler.NewAdminHandler(deps.DeadLetterProcessor, deps.EventWorker, cbRegistry)
 
 	// Create middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -68,6 +90,9 @@ func Setup(deps Dependencies) *fiber.App {
 	app.Get("/health", healthHandler.Check)
 	app.Get("/ready", healthHandler.Ready)
 	app.Get("/live", healthHandler.Live)
+
+	// Swagger documentation
+	app.Get("/swagger/*", swagger.WrapHandler)
 
 	// API v1 routes
 	v1 := app.Group("/api/v1")
@@ -91,12 +116,17 @@ func Setup(deps Dependencies) *fiber.App {
 	alerts.Post("/:id/resolve", middleware.RequireOperator(), alertHandler.Resolve)
 	alerts.Delete("/:id", middleware.RequireAdmin(), alertHandler.Delete)
 
+	// Admin routes (admin only)
+	admin := v1.Group("/admin", authMiddleware.Authenticate, middleware.RequireAdmin())
+	admin.Get("/failed-events", adminHandler.GetFailedEvents)
+	admin.Post("/failed-events/:id/retry", adminHandler.RetryFailedEvent)
+	admin.Post("/failed-events/:id/ignore", adminHandler.IgnoreFailedEvent)
+	admin.Get("/metrics/events", adminHandler.GetEventMetrics)
+	admin.Get("/circuit-breakers", adminHandler.GetCircuitBreakerStats)
+
 	// WebSocket route
 	app.Use("/ws", wsHandler.Upgrade)
 	app.Get("/ws", authMiddleware.OptionalAuth, fiberws.New(wsHandler.Handle))
-
-	// Swagger documentation
-	app.Get("/swagger/*", swagger.WrapHandler)
 
 	return app
 }

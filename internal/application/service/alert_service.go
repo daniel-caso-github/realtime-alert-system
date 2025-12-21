@@ -141,8 +141,14 @@ func (s *AlertService) Acknowledge(ctx context.Context, alertID, userID entity.I
 
 	_ = s.cacheRepo.Delete(ctx, "stats:alerts")
 
+	// Publish to WebSocket (real-time)
 	if s.wsPublisher != nil {
 		s.wsPublisher.PublishAlertAcknowledged(alert)
+	}
+
+	// Publish to Event Bus (async processing)
+	if s.eventProducer != nil {
+		s.eventProducer.PublishAlertAcknowledged(ctx, alert)
 	}
 
 	return alert, nil
