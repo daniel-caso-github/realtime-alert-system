@@ -50,3 +50,21 @@ websocket:
   write_buffer_size: 1024
   ping_interval: 30s
   pong_timeout: 60s
+
+event_bus:
+  consumer_id: "api-server-1"
+  max_retries: 3
+  initial_backoff: "100ms"
+  max_backoff: "30s"
+  multiplier: 2.0
+
+
+notification:
+  slack:
+    enabled: false
+    webhook_url: ""
+    channel: "#alerts"
+    username: "Alert Bot"
+  min_severity: "high"
+  rate_limit_per_minute: 10
+  timeout: "10s"

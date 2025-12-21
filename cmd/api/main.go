@@ -33,6 +33,8 @@ import (
 
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/config"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/database"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/messaging"
+	"github.com/daniel-caso-github/realtime-alerting-system/internal/infrastructure/worker"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/http/router"
 	"github.com/daniel-caso-github/realtime-alerting-system/internal/presentation/websocket"
 )
@@ -81,14 +83,41 @@ func main() {
 	go wsHub.Run()
 	log.Info().Msg("WebSocket hub started")
 
+	// Initialize Event Bus
+	eventBus := messaging.NewRedisStreamBus(redisClient.GetClient(), cfg.EventBus.ConsumerID)
+	retryConfig := messaging.RetryConfig{
+		MaxRetries:     cfg.EventBus.MaxRetries,
+		InitialBackoff: cfg.EventBus.InitialBackoff,
+		MaxBackoff:     cfg.EventBus.MaxBackoff,
+		Multiplier:     cfg.EventBus.Multiplier,
+		Jitter:         true,
+	}
+	retryableBus := messaging.NewRetryableBus(eventBus, retryConfig)
+	log.Info().Msg("Event bus initialized")
+
+	// Initialize Event Worker
+	eventWorker := worker.NewEventWorker(retryableBus)
+	if err := eventWorker.Start(); err != nil {
+		log.Error().Err(err).Msg("Failed to start event worker")
+	}
+
+	// Initialize Dead Letter Processor
+	deadLetterProcessor := worker.NewDeadLetterProcessor(retryableBus, cacheRepo)
+	if err := deadLetterProcessor.Start(); err != nil {
+		log.Error().Err(err).Msg("Failed to start dead letter processor")
+	}
+
 	// Setup router with dependencies
 	app := router.Setup(router.Dependencies{
-		Config:        cfg,
-		UserRepo:      userRepo,
-		AlertRepo:     alertRepo,
-		CacheRepo:     cacheRepo,
-		DBHealthCheck: db,
-		WSHub:         wsHub,
+		Config:              cfg,
+		UserRepo:            userRepo,
+		AlertRepo:           alertRepo,
+		CacheRepo:           cacheRepo,
+		DBHealthCheck:       db,
+		WSHub:               wsHub,
+		EventBus:            retryableBus,
+		EventWorker:         eventWorker,
+		DeadLetterProcessor: deadLetterProcessor,
 	})
 
 	// Start server in goroutine
@@ -108,6 +137,10 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	// Stop workers
+	_ = eventWorker.Stop()
+	_ = deadLetterProcessor.Stop()
 
 	if err := app.ShutdownWithContext(ctx); err != nil {
 		log.Error().Err(err).Msg("Error during shutdown")

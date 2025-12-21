@@ -291,10 +291,17 @@ func (h *AlertHandler) Delete(c *fiber.Ctx) error {
 		return helper.BadRequest(c, "Invalid alert ID")
 	}
 
-	if err := h.alertService.Delete(c.Context(), id); err != nil {
+	// Get userID from context - it's stored as entity.ID, not string
+	userID, ok := c.Locals("userID").(entity.ID)
+	if !ok {
+		return helper.Unauthorized(c, "User ID not found in context")
+	}
+
+	if err := h.alertService.Delete(c.Context(), id, userID); err != nil {
 		if errors.Is(err, service.ErrAlertNotFound) {
 			return helper.NotFound(c, "Alert not found")
 		}
+		log.Error().Err(err).Msg("Failed to delete alert")
 		return helper.InternalError(c, "Failed to delete alert")
 	}
 
